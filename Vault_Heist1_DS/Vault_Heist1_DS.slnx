@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="Vault_Heist1_DS/Vault_Heist1_DS.vcxproj" />
+  <Project Path="Vault_Heist1_DS/Vault_Heist1_DS.vcxproj" Id="c362c167-4546-45c5-a110-daca85154e33" />
 </Solution>
