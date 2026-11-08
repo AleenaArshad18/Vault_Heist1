@@ -1,4 +1,4 @@
-#include "LayoutEngine.hpp"
+#include "LayoutEngine.h"
 
 void LayoutEngine::calculatePositions(
     VisualNode* root,

@@ -1,5 +1,5 @@
 
-#include "Renderer.hpp"
+#include "Renderer.h"
 #include <string>
 #include <iostream>
 #include <cmath>
@@ -61,7 +61,12 @@ void Renderer::drawNodes(RenderWindow& window, const VisualNode* node)
 
     circle.setOrigin({ 25.f, 25.f });
     circle.setPosition(node->position);
-    circle.setFillColor(Color(40, 120, 190));
+    if (node->highlighted) {
+        circle.setFillColor(Color(40, 170, 100));
+    }
+    else {
+        circle.setFillColor(Color(40, 120, 190));
+    }
     circle.setOutlineThickness(3.f);
     circle.setOutlineColor(Color::White);
 

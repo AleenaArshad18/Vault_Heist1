@@ -1,141 +1,540 @@
-#include "Game.hpp"
-#include <optional>
+#include "Game.h"
+
 #include <iostream>
+#include <string>
 
 using namespace sf;
 using namespace std;
 
+
+// Constructor
 Game::Game()
-    : window(VideoMode({ 1000u, 700u }), "Vault Heist: The Living Vault")
 {
+    window.create(VideoMode({ 1000u, 700u }), "Vault Heist: The Living Vault");
     window.setFramerateLimit(60);
 
     uiFontLoaded = uiFont.openFromFile("assets/fonts/BrownieStencil.ttf");
 
-    if (!uiFontLoaded) {
-        std::cout << "Error: Could not load game font." << std::endl;
+    if (!uiFontLoaded)
+    {
+        cerr << "Error: Could not load BrownieStencil.ttf" << endl;
     }
 
-    // Create the sample binary tree
-    root.left = &node30;
-    root.right = &node70;
+    // Insert initial values into the actual BST
+    bst.insert(50);
+    bst.insert(30);
+    bst.insert(70);
+    bst.insert(20);
+    bst.insert(40);
+    bst.insert(60);
+    bst.insert(80);
 
-    node30.left = &node20;
-    node30.right = &node40;
+    // Create visual copy of the BST
+    rebuildVisualTree();
 
-    node70.left = &node60;
-    node70.right = &node80;
-
-    layoutEngine.calculatePositions(&root, static_cast<float>(window.getSize().x));
+    positionGameplayTree();
 }
 
-void Game::run() {
-    while (window.isOpen()) {
+
+// Main game loop
+void Game::run()
+{
+    while (window.isOpen())
+    {
         processEvents();
         update();
         render();
     }
 }
 
-void Game::processEvents() {
-    while (const std::optional event = window.pollEvent()) {
 
-        if (event->is<Event::Closed>()) {
+// Process window events
+void Game::processEvents()
+{
+    while (auto event = window.pollEvent())
+    {
+        if (event->is<Event::Closed>())
+        {
             window.close();
         }
 
-        if (const auto* mouse = event->getIf<Event::MouseButtonPressed>()) {
-            if (mouse->button == Mouse::Button::Left) {
-                handleMouseClick(mouse->position);
-            }
-        }
-
-        if (const auto* resized = event->getIf<Event::Resized>()) {
+        if (const auto* resized = event->getIf<Event::Resized>())
+        {
             float width = static_cast<float>(resized->size.x);
             float height = static_cast<float>(resized->size.y);
 
             window.setView(View(FloatRect({ 0.f, 0.f }, { width, height })));
-            layoutEngine.calculatePositions(&root, width);
+
+            if (currentScreen == GAMEPLAY)
+            {
+                positionGameplayTree();
+            }
+            else
+            {
+                layoutEngine.calculatePositions(visualRoot, width);
+            }
+        }
+
+        if (const auto* mouse = event->getIf<Event::MouseButtonPressed>())
+        {
+            if (mouse->button == Mouse::Button::Left)
+            {
+                handleMouseClick(mouse->position);
+            }
+        }
+
+        // Handle keyboard input while search field is active
+        if (currentScreen == GAMEPLAY && searchInputActive)
+        {
+            if (const auto* key = event->getIf<Event::KeyPressed>())
+            {
+                if (key->code == Keyboard::Key::Backspace)
+                {
+                    if (!searchInput.empty())
+                    {
+                        searchInput.pop_back();
+                    }
+                }
+                else if (key->code == Keyboard::Key::Enter)
+                {
+                    performSearch();
+                }
+            }
+
+            if (const auto* text = event->getIf<Event::TextEntered>())
+            {
+                if (text->unicode >= '0' && text->unicode <= '9')
+                {
+                    if (searchInput.length() < 9)
+                    {
+                        searchInput += static_cast<char>(text->unicode);
+                    }
+                }
+            }
         }
     }
 }
 
-void Game::update() {
-    // Game logic will be added here later.
+
+// Update function
+void Game::update()
+{
+    // Future game updates will be handled here.
 }
 
-void Game::render() {
-    window.clear(Color(20, 25, 40));
 
-    switch (currentScreen) {
+// Render current screen
+void Game::render()
+{
+    window.clear(Color(18, 22, 35));
 
-    case Screen::MainMenu:
+    if (currentScreen == MAIN_MENU)
+    {
         drawMainMenu();
-        break;
-
-    case Screen::CampaignMap:
+    }
+    else if (currentScreen == CAMPAIGN_MAP)
+    {
         drawCampaignMap();
-        break;
-
-    case Screen::LevelSelect:
+    }
+    else if (currentScreen == LEVEL_SELECT)
+    {
         drawLevelSelect();
-        break;
-
-    case Screen::LevelIntro:
+    }
+    else if (currentScreen == LEVEL_INTRO)
+    {
         drawLevelIntro();
-        break;
-
-    case Screen::Gameplay:
+    }
+    else if (currentScreen == GAMEPLAY)
+    {
         drawGameplay();
-        break;
-
-    case Screen::Sandbox:
-        drawPlaceholder("SANDBOX", "Sandbox mode will be implemented later.");
-        break;
-
-    case Screen::Leaderboard:
-        drawPlaceholder("LEADERBOARD", "Your scores will appear here.");
-        break;
+    }
+    else if (currentScreen == SANDBOX)
+    {
+        drawPlaceholder("SANDBOX", "Sandbox mode is coming soon.");
+    }
+    else if (currentScreen == LEADERBOARD)
+    {
+        drawPlaceholder("LEADERBOARD", "Leaderboard is coming soon.");
     }
 
     window.display();
 }
 
-void Game::drawCenteredText(const std::string& text, float y, unsigned int fontSize) {
-    if (!uiFontLoaded)
-        return;
 
-    Text label(uiFont, text, fontSize);
-    label.setFillColor(Color::White);
+// Handle mouse clicks
+void Game::handleMouseClick(Vector2i mousePosition)
+{
+    float width = static_cast<float>(window.getSize().x);
+    float centerX = width / 2.f;
 
-    FloatRect bounds = label.getLocalBounds();
+    if (currentScreen == MAIN_MENU)
+    {
+        if (isMouseOver(mousePosition, { centerX - 150.f, 260.f }, { 300.f, 55.f }))
+        {
+            currentScreen = CAMPAIGN_MAP;
+        }
+        else if (isMouseOver(mousePosition, { centerX - 150.f, 335.f }, { 300.f, 55.f }))
+        {
+            currentScreen = SANDBOX;
+        }
+        else if (isMouseOver(mousePosition, { centerX - 150.f, 410.f }, { 300.f, 55.f }))
+        {
+            currentScreen = LEADERBOARD;
+        }
+    }
 
-    label.setOrigin({
-        bounds.position.x + bounds.size.x / 2.f,
-        bounds.position.y + bounds.size.y / 2.f
-        });
+    else if (currentScreen == CAMPAIGN_MAP)
+    {
+        if (isMouseOver(mousePosition, { centerX - 150.f, 300.f }, { 300.f, 65.f }))
+        {
+            currentScreen = LEVEL_SELECT;
+        }
+        else if (isMouseOver(mousePosition, { 30.f, 600.f }, { 150.f, 50.f }))
+        {
+            currentScreen = MAIN_MENU;
+        }
+    }
 
-    label.setPosition({
-        static_cast<float>(window.getSize().x) / 2.f,
-        y
-        });
+    else if (currentScreen == LEVEL_SELECT)
+    {
+        if (isMouseOver(mousePosition, { centerX - 180.f, 230.f }, { 110.f, 65.f }))
+        {
+            selectedLevel = 1;
+            currentScreen = LEVEL_INTRO;
+        }
+        else if (isMouseOver(mousePosition, { centerX - 55.f, 230.f }, { 110.f, 65.f }))
+        {
+            selectedLevel = 2;
+            currentScreen = LEVEL_INTRO;
+        }
+        else if (isMouseOver(mousePosition, { centerX + 70.f, 230.f }, { 110.f, 65.f }))
+        {
+            selectedLevel = 3;
+            currentScreen = LEVEL_INTRO;
+        }
+        else if (isMouseOver(mousePosition, { centerX - 180.f, 320.f }, { 110.f, 65.f }))
+        {
+            selectedLevel = 4;
+            currentScreen = LEVEL_INTRO;
+        }
+        else if (isMouseOver(mousePosition, { centerX - 55.f, 320.f }, { 110.f, 65.f }))
+        {
+            selectedLevel = 5;
+            currentScreen = LEVEL_INTRO;
+        }
+        else if (isMouseOver(mousePosition, { 30.f, 600.f }, { 150.f, 50.f }))
+        {
+            currentScreen = CAMPAIGN_MAP;
+        }
+    }
 
-    window.draw(label);
+    else if (currentScreen == LEVEL_INTRO)
+    {
+        if (isMouseOver(mousePosition, { centerX - 150.f, 450.f }, { 300.f, 60.f }))
+        {
+            currentScreen = GAMEPLAY;
+            searchInputActive = false;
+            searchInput = "";
+            searchResult = "";
+            clearHighlights(visualRoot);
+            positionGameplayTree();
+        }
+        else if (isMouseOver(mousePosition, { 30.f, 600.f }, { 150.f, 50.f }))
+        {
+            currentScreen = LEVEL_SELECT;
+        }
+    }
+
+    else if (currentScreen == GAMEPLAY)
+    {
+        // Search input field
+        if (isMouseOver(mousePosition, { width - 230.f, 205.f }, { 190.f, 40.f }))
+        {
+            searchInputActive = true;
+        }
+
+        // Search button
+        else if (isMouseOver(mousePosition, { width - 230.f, 260.f }, { 190.f, 45.f }))
+        {
+            searchInputActive = false;
+            performSearch();
+        }
+
+        // Back button
+        else if (isMouseOver(mousePosition, { 30.f, 620.f }, { 150.f, 50.f }))
+        {
+            searchInputActive = false;
+            currentScreen = LEVEL_INTRO;
+        }
+
+        // Reset button
+        else if (isMouseOver(mousePosition, { 600.f, 620.f }, { 150.f, 50.f }))
+        {
+            searchInput = "";
+            searchResult = "";
+            searchInputActive = false;
+            clearHighlights(visualRoot);
+        }
+        else
+        {
+            searchInputActive = false;
+        }
+    }
+
+    else if (currentScreen == SANDBOX)
+    {
+        if (isMouseOver(mousePosition, { 30.f, 600.f }, { 150.f, 50.f }))
+        {
+            currentScreen = MAIN_MENU;
+        }
+    }
+
+    else if (currentScreen == LEADERBOARD)
+    {
+        if (isMouseOver(mousePosition, { 30.f, 600.f }, { 150.f, 50.f }))
+        {
+            currentScreen = MAIN_MENU;
+        }
+    }
 }
 
-void Game::drawButton(const std::string& text, Vector2f position, Vector2f size, bool enabled) {
+
+// Check whether mouse is inside a button
+bool Game::isMouseOver(Vector2i mousePosition, Vector2f position, Vector2f size)
+{
+    return mousePosition.x >= position.x &&
+        mousePosition.x <= position.x + size.x &&
+        mousePosition.y >= position.y &&
+        mousePosition.y <= position.y + size.y;
+}
+
+
+// Draw main menu
+void Game::drawMainMenu()
+{
+    drawCenteredText("VAULT HEIST", 100.f, 55);
+    drawCenteredText("THE LIVING VAULT", 165.f, 25);
+
+    float centerX = static_cast<float>(window.getSize().x) / 2.f;
+
+    drawButton("CAMPAIGN", { centerX - 150.f, 260.f }, { 300.f, 55.f });
+    drawButton("SANDBOX", { centerX - 150.f, 335.f }, { 300.f, 55.f });
+    drawButton("LEADERBOARD", { centerX - 150.f, 410.f }, { 300.f, 55.f });
+}
+
+
+// Draw campaign map
+void Game::drawCampaignMap()
+{
+    drawCenteredText("CAMPAIGN MAP", 100.f, 45);
+    drawCenteredText("Choose an act to continue", 180.f, 22);
+
+    float centerX = static_cast<float>(window.getSize().x) / 2.f;
+
+    drawButton("ACT 2 - BST", { centerX - 150.f, 300.f }, { 300.f, 65.f });
+    drawButton("BACK", { 30.f, 600.f }, { 150.f, 50.f });
+}
+
+
+// Draw level selection
+void Game::drawLevelSelect()
+{
+    drawCenteredText("BINARY SEARCH TREE", 90.f, 40);
+    drawCenteredText("SELECT A LEVEL", 155.f, 25);
+
+    float centerX = static_cast<float>(window.getSize().x) / 2.f;
+
+    drawButton("LEVEL 1", { centerX - 180.f, 230.f }, { 110.f, 65.f });
+    drawButton("LEVEL 2", { centerX - 55.f, 230.f }, { 110.f, 65.f });
+    drawButton("LEVEL 3", { centerX + 70.f, 230.f }, { 110.f, 65.f });
+
+    drawButton("LEVEL 4", { centerX - 180.f, 320.f }, { 110.f, 65.f });
+    drawButton("LEVEL 5", { centerX - 55.f, 320.f }, { 110.f, 65.f });
+
+    drawButton("BACK", { 30.f, 600.f }, { 150.f, 50.f });
+}
+
+
+// Draw level introduction
+void Game::drawLevelIntro()
+{
+    drawCenteredText("LEVEL INTRODUCTION", 80.f, 40);
+
+    string mission;
+    string description;
+
+    if (selectedLevel == 1)
+    {
+        mission = "THE FIRST SEARCH";
+        description = "Find the target value in the BST.";
+    }
+    else if (selectedLevel == 2)
+    {
+        mission = "INSERTION";
+        description = "Insert the required value into the BST.";
+    }
+    else if (selectedLevel == 3)
+    {
+        mission = "DELETION";
+        description = "Remove the required value from the BST.";
+    }
+    else if (selectedLevel == 4)
+    {
+        mission = "TREE TRAVERSAL";
+        description = "Follow the correct traversal order.";
+    }
+    else if (selectedLevel == 5)
+    {
+        mission = "BST CHALLENGE";
+        description = "Complete the binary search tree challenge.";
+    }
+    else
+    {
+        mission = "UNKNOWN LEVEL";
+        description = "No level information available.";
+    }
+
+    drawCenteredText("LEVEL " + to_string(selectedLevel), 180.f, 30);
+    drawCenteredText(mission, 250.f, 28);
+    drawCenteredText(description, 320.f, 21);
+
+    float centerX = static_cast<float>(window.getSize().x) / 2.f;
+
+    drawButton("START LEVEL", { centerX - 150.f, 450.f }, { 300.f, 60.f });
+    drawButton("BACK", { 30.f, 600.f }, { 150.f, 50.f });
+}
+
+
+// Draw gameplay screen
+void Game::drawGameplay()
+{
+    float width = static_cast<float>(window.getSize().x);
+
+    // Top HUD
+    drawPanel({ 20.f, 15.f }, { width - 40.f, 65.f });
+
+    drawText("LEVEL " + to_string(selectedLevel), { 40.f, 35.f }, 22);
+    drawText("BST ACT", { width - 180.f, 35.f }, 22);
+
+    // Mission panel
+    drawPanel({ 20.f, 100.f }, { 230.f, 470.f });
+
+    drawText("MISSION", { 40.f, 120.f }, 25);
+
+    if (selectedLevel == 1)
+    {
+        drawText("Find the target", { 40.f, 175.f }, 18);
+        drawText("value in the BST.", { 40.f, 205.f }, 18);
+        drawText("Search any value", { 40.f, 270.f }, 16);
+    }
+    else if (selectedLevel == 2)
+    {
+        drawText("Insert a value", { 40.f, 175.f }, 18);
+        drawText("into the BST.", { 40.f, 205.f }, 18);
+    }
+    else if (selectedLevel == 3)
+    {
+        drawText("Delete a value", { 40.f, 175.f }, 18);
+        drawText("from the BST.", { 40.f, 205.f }, 18);
+    }
+    else if (selectedLevel == 4)
+    {
+        drawText("Follow the", { 40.f, 175.f }, 18);
+        drawText("traversal order.", { 40.f, 205.f }, 18);
+    }
+    else
+    {
+        drawText("Complete the", { 40.f, 175.f }, 18);
+        drawText("BST challenge.", { 40.f, 205.f }, 18);
+    }
+
+    // Tree visualization panel
+    drawPanel({ 270.f, 100.f }, { width - 540.f, 470.f });
+
+    drawText("TREE VISUALIZATION", { 290.f, 115.f }, 20);
+
+    renderer.drawTree(window, visualRoot);
+
+    // Operations panel
+    drawPanel({ width - 250.f, 100.f }, { 230.f, 470.f });
+
+    drawText("OPERATIONS", { width - 230.f, 120.f }, 23);
+
+    drawText("SEARCH VALUE", { width - 230.f, 175.f }, 17);
+
+    // Search input field
+    RectangleShape inputBox({ 190.f, 40.f });
+    inputBox.setPosition({ width - 230.f, 205.f });
+    inputBox.setFillColor(Color(18, 22, 35));
+
+    if (searchInputActive)
+    {
+        inputBox.setOutlineColor(Color(70, 180, 240));
+    }
+    else
+    {
+        inputBox.setOutlineColor(Color(100, 120, 145));
+    }
+
+    inputBox.setOutlineThickness(2.f);
+    window.draw(inputBox);
+
+    if (searchInput.empty())
+    {
+        drawText("Enter value...", { width - 220.f, 215.f }, 15);
+    }
+    else
+    {
+        drawText(searchInput, { width - 220.f, 215.f }, 18);
+    }
+
+    drawButton("SEARCH", { width - 230.f, 260.f }, { 190.f, 45.f });
+
+    // Event log
+    drawText("EVENT LOG", { width - 230.f, 355.f }, 21);
+
+    if (searchResult.empty())
+    {
+        drawText("Waiting for action...", { width - 230.f, 395.f }, 14);
+    }
+    else
+    {
+        drawText(searchResult, { width - 230.f, 395.f }, 14);
+    }
+
+    // Bottom toolbar
+    drawButton("BACK", { 30.f, 620.f }, { 150.f, 50.f });
+    drawButton("UNDO", { 220.f, 620.f }, { 150.f, 50.f });
+    drawButton("HINT", { 410.f, 620.f }, { 150.f, 50.f });
+    drawButton("RESET", { 600.f, 620.f }, { 150.f, 50.f });
+}
+
+
+// Draw placeholder screens
+void Game::drawPlaceholder(const string& title, const string& message)
+{
+    drawCenteredText(title, 150.f, 45);
+    drawCenteredText(message, 260.f, 22);
+
+    drawButton("BACK", { 30.f, 600.f }, { 150.f, 50.f });
+}
+
+
+// Draw a button
+void Game::drawButton(const string& text, Vector2f position, Vector2f size, bool enabled)
+{
     RectangleShape button(size);
 
     button.setPosition(position);
-    button.setFillColor(enabled ? Color(45, 100, 160) : Color(65, 65, 75));
+    button.setFillColor(enabled ? Color(45, 65, 95) : Color(65, 65, 65));
+    button.setOutlineColor(Color(100, 160, 210));
     button.setOutlineThickness(2.f);
-    button.setOutlineColor(Color(180, 190, 210));
 
     window.draw(button);
 
-    if (uiFontLoaded) {
-        Text label(uiFont, text, 22);
-        label.setFillColor(enabled ? Color::White : Color(150, 150, 150));
+    if (uiFontLoaded)
+    {
+        Text label(uiFont, text, 20);
 
         FloatRect bounds = label.getLocalBounds();
 
@@ -149,227 +548,219 @@ void Game::drawButton(const std::string& text, Vector2f position, Vector2f size,
             position.y + size.y / 2.f
             });
 
+        label.setFillColor(Color::White);
+
         window.draw(label);
     }
 }
 
-bool Game::isMouseOver(Vector2i mousePosition, Vector2f position, Vector2f size) {
-    return mousePosition.x >= position.x &&
-        mousePosition.x <= position.x + size.x &&
-        mousePosition.y >= position.y &&
-        mousePosition.y <= position.y + size.y;
+
+// Draw centered text
+void Game::drawCenteredText(const string& text, float y, unsigned int fontSize)
+{
+    if (!uiFontLoaded)
+    {
+        return;
+    }
+
+    Text label(uiFont, text, fontSize);
+
+    FloatRect bounds = label.getLocalBounds();
+
+    label.setOrigin({
+        bounds.position.x + bounds.size.x / 2.f,
+        bounds.position.y + bounds.size.y / 2.f
+        });
+
+    label.setPosition({
+        static_cast<float>(window.getSize().x) / 2.f,
+        y
+        });
+
+    label.setFillColor(Color::White);
+
+    window.draw(label);
 }
 
-// MAIN MENU
 
-void Game::drawMainMenu() {
-    float centerX = window.getSize().x / 2.f;
+// Draw text at a specific position
+void Game::drawText(const string& text, Vector2f position, unsigned int fontSize)
+{
+    if (!uiFontLoaded)
+    {
+        return;
+    }
 
-    drawCenteredText("VAULT HEIST", 150.f, 48);
-    drawCenteredText("THE LIVING VAULT", 205.f, 25);
+    Text label(uiFont, text, fontSize);
 
-    drawButton("PLAY", { centerX - 150.f, 300.f }, { 300.f, 55.f });
-    drawButton("SANDBOX", { centerX - 150.f, 375.f }, { 300.f, 55.f });
-    drawButton("LEADERBOARD", { centerX - 150.f, 450.f }, { 300.f, 55.f });
-    drawButton("EXIT", { centerX - 150.f, 525.f }, { 300.f, 55.f });
+    label.setPosition(position);
+    label.setFillColor(Color::White);
+
+    window.draw(label);
 }
 
-// CAMPAIGN MAP
 
-void Game::drawCampaignMap() {
-    float centerX = window.getSize().x / 2.f;
+// Draw panel
+void Game::drawPanel(Vector2f position, Vector2f size)
+{
+    RectangleShape panel(size);
 
-    drawCenteredText("CAMPAIGN MAP", 100.f, 40);
+    panel.setPosition(position);
+    panel.setFillColor(Color(28, 35, 52));
+    panel.setOutlineColor(Color(65, 85, 115));
+    panel.setOutlineThickness(1.5f);
 
-    drawButton("ACT 1 - BINARY TREE", { centerX - 200.f, 200.f }, { 400.f, 55.f }, false);
-    drawButton("ACT 2 - BST", { centerX - 200.f, 275.f }, { 400.f, 55.f });
-    drawButton("ACT 3 - AVL TREE", { centerX - 200.f, 350.f }, { 400.f, 55.f }, false);
-    drawButton("ACT 4 - MAX HEAP", { centerX - 200.f, 425.f }, { 400.f, 55.f }, false);
-
-    drawButton("BACK", { centerX - 100.f, 550.f }, { 200.f, 50.f });
+    window.draw(panel);
 }
 
-// LEVEL SELECT
 
-void Game::drawLevelSelect() {
-    float centerX = window.getSize().x / 2.f;
+// Calculate visual tree positions
+void Game::positionGameplayTree()
+{
+    float width = static_cast<float>(window.getSize().x);
 
-    drawCenteredText("ACT 2 - BST", 100.f, 40);
-    drawCenteredText("SELECT A LEVEL", 155.f, 22);
+    layoutEngine.calculatePositions(visualRoot, width * 0.5f, 200.f, 90.f);
 
-    drawButton("LEVEL 1 - SEARCH", { centerX - 180.f, 210.f }, { 360.f, 50.f });
-    drawButton("LEVEL 2 - INSERTION", { centerX - 180.f, 275.f }, { 360.f, 50.f });
-    drawButton("LEVEL 3 - DELETION", { centerX - 180.f, 340.f }, { 360.f, 50.f });
-    drawButton("LEVEL 4 - RANGE QUERY", { centerX - 180.f, 405.f }, { 360.f, 50.f });
-    drawButton("LEVEL 5 - BOSS", { centerX - 180.f, 470.f }, { 360.f, 50.f });
-
-    drawButton("BACK", { centerX - 100.f, 565.f }, { 200.f, 45.f });
+    shiftTree(visualRoot, width * 0.25f);
 }
 
-// PLACEHOLDER SCREENS
 
-void Game::drawPlaceholder(const std::string& title, const std::string& message) {
-    float centerX = window.getSize().x / 2.f;
+// Shift visual tree horizontally
+void Game::shiftTree(VisualNode* node, float offsetX)
+{
+    if (node == nullptr)
+    {
+        return;
+    }
 
-    drawCenteredText(title, 200.f, 40);
-    drawCenteredText(message, 300.f, 20);
+    node->position.x += offsetX;
 
-    drawButton("BACK", { centerX - 100.f, 450.f }, { 200.f, 55.f });
+    shiftTree(node->left, offsetX);
+    shiftTree(node->right, offsetX);
 }
 
-// BUTTON CLICK HANDLING
 
-void Game::handleMouseClick(Vector2i mousePosition) {
-    float centerX = window.getSize().x / 2.f;
+// Convert a BST Node into a VisualNode
+VisualNode* Game::convertToVisualTree(Node* node)
+{
+    if (node == nullptr)
+    {
+        return nullptr;
+    }
 
-    if (currentScreen == Screen::MainMenu) {
+    VisualNode* visualNode = new VisualNode;
 
-        if (isMouseOver(mousePosition, { centerX - 150.f, 300.f }, { 300.f, 55.f })) {
-            currentScreen = Screen::CampaignMap;
-        }
-        else if (isMouseOver(mousePosition, { centerX - 150.f, 375.f }, { 300.f, 55.f })) {
-            currentScreen = Screen::Sandbox;
-        }
-        else if (isMouseOver(mousePosition, { centerX - 150.f, 450.f }, { 300.f, 55.f })) {
-            currentScreen = Screen::Leaderboard;
-        }
-        else if (isMouseOver(mousePosition, { centerX - 150.f, 525.f }, { 300.f, 55.f })) {
-            window.close();
+    visualNode->value = node->data;
+    visualNode->left = convertToVisualTree(node->left);
+    visualNode->right = convertToVisualTree(node->right);
+
+    return visualNode;
+}
+
+
+// Delete visual tree to release its allocated memory
+void Game::deleteVisualTree(VisualNode* node)
+{
+    if (node == nullptr)
+    {
+        return;
+    }
+
+    deleteVisualTree(node->left);
+    deleteVisualTree(node->right);
+
+    delete node;
+}
+
+
+// Rebuild visual tree from the actual BST
+void Game::rebuildVisualTree()
+{
+    deleteVisualTree(visualRoot);
+
+    visualRoot = convertToVisualTree(bst.getRoot());
+
+    positionGameplayTree();
+}
+
+
+// Clear all highlighted nodes
+void Game::clearHighlights(VisualNode* node)
+{
+    if (node == nullptr)
+    {
+        return;
+    }
+
+    node->highlighted = false;
+
+    clearHighlights(node->left);
+    clearHighlights(node->right);
+}
+
+
+// Highlight a node with the given value
+void Game::highlightNode(VisualNode* node, int value)
+{
+    if (node == nullptr)
+    {
+        return;
+    }
+
+    if (node->value == value)
+    {
+        node->highlighted = true;
+    }
+
+    highlightNode(node->left, value);
+    highlightNode(node->right, value);
+}
+
+
+// Perform BST search
+void Game::performSearch()
+{
+    if (searchInput.empty())
+    {
+        searchResult = "Enter a value first.";
+        return;
+    }
+
+    int target = stoi(searchInput);
+
+    int path[100];
+    int pathLength = 0;
+
+    clearHighlights(visualRoot);
+
+    // Call your BST search function
+    bool found = bst.search(target, path, &pathLength);
+
+    // Highlight every visited node
+    for (int i = 0; i < pathLength; i++)
+    {
+        highlightNode(visualRoot, path[i]);
+    }
+
+    // Build the search path text
+    string pathText = "Path: ";
+
+    for (int i = 0; i < pathLength; i++)
+    {
+        pathText += to_string(path[i]);
+
+        if (i < pathLength - 1)
+        {
+            pathText += " -> ";
         }
     }
 
-    else if (currentScreen == Screen::CampaignMap) {
-
-        if (isMouseOver(mousePosition, { centerX - 200.f, 275.f }, { 400.f, 55.f })) {
-            currentScreen = Screen::LevelSelect;
-        }
-        else if (isMouseOver(mousePosition, { centerX - 100.f, 550.f }, { 200.f, 50.f })) {
-            currentScreen = Screen::MainMenu;
-        }
+    if (found)
+    {
+        searchResult = "Found! " + pathText;
     }
-
-    else if (currentScreen == Screen::LevelSelect) {
-
-        for (int i = 0; i < 5; i++) {
-            float y = 210.f + i * 65.f;
-
-            if (isMouseOver(mousePosition, { centerX - 180.f, y }, { 360.f, 50.f })) {
-                selectedLevel = i + 1;
-                currentScreen = Screen::LevelIntro;
-                break;
-            }
-        }
-
-        if (isMouseOver(mousePosition, { centerX - 100.f, 565.f }, { 200.f, 45.f })) {
-            currentScreen = Screen::CampaignMap;
-        }
+    else
+    {
+        searchResult = "Not found. " + pathText;
     }
-
-    else if (currentScreen == Screen::LevelIntro) {
-
-        if (isMouseOver(mousePosition, { centerX - 150.f, 500.f }, { 300.f, 55.f })) {
-            currentScreen = Screen::Gameplay;
-        }
-        else if (isMouseOver(mousePosition, { centerX - 100.f, 580.f }, { 200.f, 45.f })) {
-            currentScreen = Screen::LevelSelect;
-        }
-    }
-
-    else if (currentScreen == Screen::Gameplay) {
-
-        if (isMouseOver(mousePosition, { centerX - 100.f, 620.f }, { 200.f, 45.f })) {
-            currentScreen = Screen::LevelIntro;
-        }
-    }
-
-    else if (currentScreen == Screen::Sandbox || currentScreen == Screen::Leaderboard) {
-
-        if (isMouseOver(mousePosition, { centerX - 100.f, 450.f }, { 200.f, 55.f })) {
-            currentScreen = Screen::MainMenu;
-        }
-    }
-
-}
-
-void Game::drawLevelIntro() {
-    std::string levelName;
-    std::string story;
-    std::string objective;
-    std::string instructions;
-
-    switch (selectedLevel) {
-
-    case 1:
-        levelName = "BST SEARCH";
-        story = "A hidden artifact is locked inside the vault.";
-        objective = "Objective: Find the required value in the BST.";
-        instructions = "Follow the tree and choose the correct path.";
-        break;
-
-    case 2:
-        levelName = "BST INSERTION";
-        story = "A new artifact needs to be added to the vault.";
-        objective = "Objective: Insert a new value into the BST.";
-        instructions = "Find the correct position while maintaining BST order.";
-        break;
-
-    case 3:
-        levelName = "BST DELETION";
-        story = "An outdated artifact must be removed.";
-        objective = "Objective: Delete the specified value.";
-        instructions = "Maintain the BST structure after deletion.";
-        break;
-
-    case 4:
-        levelName = "BST RANGE QUERY";
-        story = "The vault contains artifacts with different values.";
-        objective = "Objective: Find values within the given range.";
-        instructions = "Identify all nodes that satisfy the range.";
-        break;
-
-    case 5:
-        levelName = "BST BOSS LEVEL";
-        story = "The final vault challenge is waiting.";
-        objective = "Objective: Complete the BST challenge.";
-        instructions = "Use your BST knowledge to solve the challenge.";
-        break;
-
-    default:
-        levelName = "UNKNOWN LEVEL";
-        story = "";
-        objective = "";
-        instructions = "";
-        break;
-    }
-
-    drawCenteredText("LEVEL " + std::to_string(selectedLevel), 75.f, 25);
-    drawCenteredText(levelName, 135.f, 40);
-
-    drawCenteredText("MISSION BRIEFING", 235.f, 25);
-    drawCenteredText(story, 290.f, 19);
-
-    drawCenteredText(objective, 370.f, 19);
-    drawCenteredText(instructions, 420.f, 18);
-
-    float centerX = window.getSize().x / 2.f;
-
-    drawButton("START LEVEL", { centerX - 150.f, 500.f }, { 300.f, 55.f });
-    drawButton("BACK", { centerX - 100.f, 580.f }, { 200.f, 45.f });
-}
-
-void Game::drawGameplay() {
-    drawCenteredText("BST LEVEL " + std::to_string(selectedLevel), 40.f, 30);
-
-    drawCenteredText("ALARM: 0", 100.f, 20);
-    drawCenteredText("SCORE: 1000", 140.f, 20);
-
-    renderer.drawTree(window, &root);
-
-    float centerX = window.getSize().x / 2.f;
-
-    drawButton("UNDO", { centerX - 300.f, 550.f }, { 130.f, 45.f });
-    drawButton("RESET", { centerX - 65.f, 550.f }, { 130.f, 45.f });
-    drawButton("HINT", { centerX + 170.f, 550.f }, { 130.f, 45.f });
-
-    drawButton("BACK", { centerX - 100.f, 620.f }, { 200.f, 45.f });
 }

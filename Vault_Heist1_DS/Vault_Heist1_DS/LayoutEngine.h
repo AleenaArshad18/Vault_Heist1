@@ -1,5 +1,5 @@
 #pragma once
-#include "VisualNode.hpp"
+#include "VisualNode.h"
 
 using namespace sf;
 

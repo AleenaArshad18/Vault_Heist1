@@ -2,7 +2,7 @@
 #pragma once
 
 #include <SFML/Graphics.hpp>
-#include "VisualNode.hpp"
+#include "VisualNode.h"
 using namespace sf;
 
 class Renderer

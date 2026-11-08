@@ -145,16 +145,18 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="BST.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="LayoutEngine.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Renderer.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Game.hpp" />
-    <ClInclude Include="LayoutEngine.hpp" />
-    <ClInclude Include="Renderer.hpp" />
-    <ClInclude Include="VisualNode.hpp" />
+    <ClInclude Include="BST.h" />
+    <ClInclude Include="Game.h" />
+    <ClInclude Include="LayoutEngine.h" />
+    <ClInclude Include="Renderer.h" />
+    <ClInclude Include="VisualNode.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
