@@ -9,6 +9,7 @@
 #include "BST.h"
 
 using namespace sf;
+using namespace std;
 
 class Game
 {
@@ -54,6 +55,7 @@ private:
 
     // Search functionality
     void performSearch();
+    void performInsert();
     void clearHighlights(VisualNode* node);
     void highlightNode(VisualNode* node, int value);
 
@@ -77,7 +79,7 @@ private:
     VisualNode* visualRoot = nullptr;
 
     // Search input and result
-    std::string searchInput = "";
-    std::string searchResult = "";
+    string searchInput = "";
+    string searchResult = "";
     bool searchInputActive = false;
 };

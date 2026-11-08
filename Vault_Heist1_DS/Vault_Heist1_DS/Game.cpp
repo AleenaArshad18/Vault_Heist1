@@ -144,7 +144,7 @@ void Game::render()
     {
         drawLevelIntro();
     }
-    else if (currentScreen == GAMEPLAY)
+    else if (currentScreen == GAMEPLAY)//
     {
         drawGameplay();
     }
@@ -258,6 +258,13 @@ void Game::handleMouseClick(Vector2i mousePosition)
         {
             searchInputActive = false;
             performSearch();
+        }
+
+        // Insert button
+        else if (isMouseOver(mousePosition, { width - 230.f, 315.f }, { 190.f, 45.f }))
+        {
+            searchInputActive = false;
+            performInsert();
         }
 
         // Back button
@@ -489,17 +496,18 @@ void Game::drawGameplay()
     }
 
     drawButton("SEARCH", { width - 230.f, 260.f }, { 190.f, 45.f });
+    drawButton("INSERT", { width - 230.f, 315.f }, { 190.f, 45.f });
 
     // Event log
-    drawText("EVENT LOG", { width - 230.f, 355.f }, 21);
+    drawText("EVENT LOG", { width - 230.f, 390.f }, 21);
 
     if (searchResult.empty())
     {
-        drawText("Waiting for action...", { width - 230.f, 395.f }, 14);
+        drawText("Waiting for action...", { width - 230.f, 430.f }, 14);
     }
     else
     {
-        drawText(searchResult, { width - 230.f, 395.f }, 14);
+        drawText(searchResult, { width - 230.f, 430.f }, 14);
     }
 
     // Bottom toolbar
@@ -763,4 +771,43 @@ void Game::performSearch()
     {
         searchResult = "Not found. " + pathText;
     }
+}
+
+void Game::performInsert()
+{
+    if (searchInput.empty())
+    {
+        searchResult = "Enter a value first.";
+        return;
+    }
+
+    int value = stoi(searchInput);
+
+    int path[100];
+    int pathLength = 0;
+
+    // Check whether the value already exists
+    bool exists = bst.search(value, path, &pathLength);
+
+    clearHighlights(visualRoot);
+
+    if (exists)
+    {
+        // Highlight the existing value
+        highlightNode(visualRoot, value);
+
+        searchResult = "Duplicate! Value exists.";
+        return;
+    }
+
+    // Insert the new value into the actual BST
+    bst.insert(value);
+
+    // Rebuild the visual tree to show the new node
+    rebuildVisualTree();
+
+    // Highlight the newly inserted node
+    highlightNode(visualRoot, value);
+
+    searchResult = "Successfully inserted!";
 }
