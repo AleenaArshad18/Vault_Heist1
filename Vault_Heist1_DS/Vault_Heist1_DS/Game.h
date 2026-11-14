@@ -16,7 +16,7 @@ class Game
 public:
     Game();
     void run();
-
+    //
 private:
     static const int MAIN_MENU = 0;
     static const int CAMPAIGN_MAP = 1;
