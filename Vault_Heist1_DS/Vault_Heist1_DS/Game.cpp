@@ -8,8 +8,16 @@ using namespace std;
 
 
 // Constructor
-Game::Game()
+Game::Game() : maxHeap(10)
 {
+    maxHeap.insert(50);
+    maxHeap.insert(30);
+    maxHeap.insert(40);
+    maxHeap.insert(10);
+    maxHeap.insert(20);
+
+    rebuildHeapVisualTree();
+
     window.create(VideoMode({ 1000u, 700u }), "Vault Heist: The Living Vault");
     window.setFramerateLimit(60);
 
@@ -47,6 +55,12 @@ void Game::run()
     }
 }
 
+Game::~Game()
+{
+    delete[] previousHeapState;
+    deleteVisualTree(visualRoot);
+    deleteHeapVisualTree(heapVisualRoot);
+}
 
 // Process window events
 void Game::processEvents()
@@ -56,6 +70,23 @@ void Game::processEvents()
         if (event->is<Event::Closed>())
         {
             window.close();
+        }
+
+        if (event->is<sf::Event::TextEntered>())
+        {
+            if (heapInputActive)
+            {
+                auto textEvent = event->getIf<sf::Event::TextEntered>();
+
+                if (textEvent->unicode >= '0' && textEvent->unicode <= '9')
+                {
+                    heapInput += static_cast<char>(textEvent->unicode);
+                }
+                else if (textEvent->unicode == 8 && !heapInput.empty())
+                {
+                    heapInput.pop_back();
+                }
+            }
         }
 
         if (const auto* resized = event->getIf<Event::Resized>())
@@ -144,9 +175,16 @@ void Game::render()
     {
         drawLevelIntro();
     }
-    else if (currentScreen == GAMEPLAY)//
+    else if (currentScreen == GAMEPLAY)
     {
-        drawGameplay();
+        if (selectedAct == 2)
+        {
+            drawGameplay();
+        }
+        else if (selectedAct == 4)
+        {
+            drawHeapGameplay();
+        }
     }
     else if (currentScreen == SANDBOX)
     {
@@ -159,6 +197,7 @@ void Game::render()
 
     window.display();
 }
+
 
 
 // Handle mouse clicks
@@ -185,10 +224,21 @@ void Game::handleMouseClick(Vector2i mousePosition)
 
     else if (currentScreen == CAMPAIGN_MAP)
     {
-        if (isMouseOver(mousePosition, { centerX - 150.f, 300.f }, { 300.f, 65.f }))
+        // Act 2 - BST
+        if (isMouseOver(mousePosition, { centerX - 150.f, 270.f }, { 300.f, 65.f }))
         {
+            selectedAct = 2;
             currentScreen = LEVEL_SELECT;
         }
+
+        // Act 4 - Heap Fortress
+        else if (isMouseOver(mousePosition, { centerX - 150.f, 370.f }, { 300.f, 65.f }))
+        {
+            selectedAct = 4;
+            currentScreen = LEVEL_SELECT;
+        }
+
+        // Back button
         else if (isMouseOver(mousePosition, { 30.f, 600.f }, { 150.f, 50.f }))
         {
             currentScreen = MAIN_MENU;
@@ -230,15 +280,34 @@ void Game::handleMouseClick(Vector2i mousePosition)
 
     else if (currentScreen == LEVEL_INTRO)
     {
+        // Start Level button
         if (isMouseOver(mousePosition, { centerX - 150.f, 450.f }, { 300.f, 60.f }))
         {
             currentScreen = GAMEPLAY;
-            searchInputActive = false;
-            searchInput = "";
-            searchResult = "";
-            clearHighlights(visualRoot);
-            positionGameplayTree();
+
+            if (selectedAct == 2)
+            {
+                searchInputActive = false;
+                searchInput = "";
+                searchResult = "";
+
+                clearHighlights(visualRoot);
+                positionGameplayTree();
+            }
+            else if (selectedAct == 4)
+            {
+                selectedHeapIndex = -1;
+                heapInput = "";
+                heapResult = "";
+                heapInputActive = false;
+                heapEventCount = 0;
+                canUndo = false;
+
+                loadHeapLevel();
+            }
         }
+
+        // Back button
         else if (isMouseOver(mousePosition, { 30.f, 600.f }, { 150.f, 50.f }))
         {
             currentScreen = LEVEL_SELECT;
@@ -247,79 +316,238 @@ void Game::handleMouseClick(Vector2i mousePosition)
 
     else if (currentScreen == GAMEPLAY)
     {
-        // Search input field
-        if (isMouseOver(mousePosition, { width - 230.f, 205.f }, { 190.f, 40.f }))
+        if (selectedAct == 4)
         {
-            searchInputActive = true;
+            // Build Max Heap
+            if (isMouseOver(mousePosition, { 760.f, 230.f }, { 200.f, 40.f }))
+            {
+                saveHeapState();
+
+                maxHeap.buildMaxHeap();
+                rebuildHeapVisualTree();
+
+                heapResult = "Max Heap built successfully!";
+
+                addHeapEvent("HEAP_BUILD");
+            }
+
+            // Heapify
+            else if (isMouseOver(mousePosition, { 760.f, 280.f }, { 200.f, 40.f }))
+            {
+                saveHeapState();
+
+                maxHeap.buildMaxHeap();
+                rebuildHeapVisualTree();
+
+                heapResult = "Heapify completed!";
+
+                addHeapEvent("HEAPIFY_DONE");
+            }
+
+            // Heap input field
+            else if (isMouseOver(mousePosition, { 760.f, 320.f }, { 200.f, 35.f }))
+            {
+                heapInputActive = true;
+            }
+
+            // Insert
+            else if (isMouseOver(mousePosition, { 760.f, 365.f }, { 200.f, 40.f }))
+            {
+                heapInputActive = false;
+
+                if (heapInput != "")
+                {
+                    int value = stoi(heapInput);
+
+                    saveHeapState();
+
+                    maxHeap.insert(value);
+                    rebuildHeapVisualTree();
+
+                    heapResult = "Value inserted successfully";
+                    heapInput = "";
+
+                    addHeapEvent("HEAP_INSERT");
+                }
+            }
+
+            // Extract Maximum button
+            else if (isMouseOver(mousePosition, { 760.f, 415.f }, { 200.f, 40.f }))
+            {
+                int maximum;
+
+                saveHeapState();
+
+                if (maxHeap.extractMax(&maximum))
+                {
+                    heapResult = "Extracted maximum: " + to_string(maximum);
+
+                    rebuildHeapVisualTree();
+
+                    addHeapEvent("EXTRACT_MAX");
+                }
+                else
+                {
+                    heapResult = "Heap is empty!";
+                }
+            }
+
+            // Heap Sort button
+            else if (isMouseOver(mousePosition, { 760.f, 465.f }, { 200.f, 40.f }))
+            {
+                saveHeapState();
+
+                maxHeap.heapSort();
+                rebuildHeapVisualTree();
+
+                heapResult = "Heap Sort completed!";
+
+                addHeapEvent("HEAP_SORT_COMPLETE");
+            }
+
+            // Undo
+            else if (isMouseOver(mousePosition, { 760.f, 515.f }, { 95.f, 40.f }))
+            {
+                undoHeapOperation();
+
+                addHeapEvent("UNDO");
+            }
+
+            // Replay
+            else if (isMouseOver(mousePosition, { 865.f, 515.f }, { 95.f, 40.f }))
+            {
+                replayHeapLevel();
+
+                addHeapEvent("REPLAY");
+            }
+
+            // Reset Level
+            else if (isMouseOver(mousePosition, { 760.f, 565.f }, { 200.f, 40.f }))
+            {
+                loadHeapLevel();
+
+                heapInput = "";
+                heapResult = "";
+                heapInputActive = false;
+                selectedHeapIndex = -1;
+                heapEventCount = 0;
+                canUndo = false;
+            }
+
+            // Select an array element
+            else
+            {
+                int totalElements = maxHeap.getSize();
+
+                float cellWidth = 70.f;
+                float gap = 10.f;
+
+                float totalWidth = totalElements * cellWidth +
+                    (totalElements - 1) * gap;
+
+                float startX = (window.getSize().x - totalWidth) / 2.f;
+
+                selectedHeapIndex = -1;
+
+                for (int i = 0; i < totalElements; i++)
+                {
+                    float x = startX + i * (cellWidth + gap);
+
+                    if (isMouseOver(mousePosition, { x, 505.f }, { cellWidth, 55.f }))
+                    {
+                        selectedHeapIndex = i;
+                        break;
+                    }
+                }
+
+                if (selectedHeapIndex != -1)
+                {
+                    clearHighlights(heapVisualRoot);
+                    highlightHeapNode(heapVisualRoot, selectedHeapIndex);
+                }
+                else
+                {
+                    clearHighlights(heapVisualRoot);
+                }
+            }
         }
 
-        // Search button
-        else if (isMouseOver(mousePosition, { width - 230.f, 260.f }, { 190.f, 38.f }))
+        else if (selectedAct == 2)
         {
-            searchInputActive = false;
-            performSearch();
-        }
+            // Search input field
+            if (isMouseOver(mousePosition, { width - 230.f, 205.f }, { 190.f, 40.f }))
+            {
+                searchInputActive = true;
+            }
 
-        // Insert button
-        else if (isMouseOver(mousePosition, { width - 230.f, 305.f }, { 190.f, 38.f }))
-        {
-            searchInputActive = false;
-            performInsert();
-        }
+            // Search button
+            else if (isMouseOver(mousePosition, { width - 230.f, 260.f }, { 190.f, 38.f }))
+            {
+                searchInputActive = false;
+                performSearch();
+            }
 
-        // Delete button
-        else if (isMouseOver(mousePosition, { width - 230.f, 350.f }, { 190.f, 38.f }))
-        {
-            searchInputActive = false;
-            performDelete();
-        }
+            // Insert button
+            else if (isMouseOver(mousePosition, { width - 230.f, 305.f }, { 190.f, 38.f }))
+            {
+                searchInputActive = false;
+                performInsert();
+            }
 
-        // Minimum button
-        else if (isMouseOver(mousePosition, { width - 230.f, 395.f }, { 190.f, 38.f }))
-        {
-            searchInputActive = false;
-            performMinimum();
-        }
+            // Delete button
+            else if (isMouseOver(mousePosition, { width - 230.f, 350.f }, { 190.f, 38.f }))
+            {
+                searchInputActive = false;
+                performDelete();
+            }
 
-        // Maximum button
-        else if (isMouseOver(mousePosition, { width - 230.f, 440.f }, { 190.f, 38.f }))
-        {
-            searchInputActive = false;
-            performMaximum();
-        }
+            // Minimum button
+            else if (isMouseOver(mousePosition, { width - 230.f, 395.f }, { 190.f, 38.f }))
+            {
+                searchInputActive = false;
+                performMinimum();
+            }
 
-        // Successor
-        else if (isMouseOver(mousePosition, { width - 230.f, 450.f }, { 190.f, 34.f }))
-        {
-            searchInputActive = false;
-            performSuccessor();
-        }
+            // Maximum button
+            else if (isMouseOver(mousePosition, { width - 230.f, 440.f }, { 190.f, 38.f }))
+            {
+                searchInputActive = false;
+                performMaximum();
+            }
 
-        // Predecessor
-        else if (isMouseOver(mousePosition, { width - 230.f, 488.f }, { 190.f, 34.f }))
-        {
-            searchInputActive = false;
-            performPredecessor();
-        }
+            // Successor
+            else if (isMouseOver(mousePosition, { width - 230.f, 450.f }, { 190.f, 34.f }))
+            {
+                searchInputActive = false;
+                performSuccessor();
+            }
 
-        // Back button
-        else if (isMouseOver(mousePosition, { 30.f, 620.f }, { 150.f, 50.f }))
-        {
-            searchInputActive = false;
-            currentScreen = LEVEL_INTRO;
-        }
+            // Predecessor
+            else if (isMouseOver(mousePosition, { width - 230.f, 488.f }, { 190.f, 34.f }))
+            {
+                searchInputActive = false;
+                performPredecessor();
+            }
 
-        // Reset button
-        else if (isMouseOver(mousePosition, { 600.f, 620.f }, { 150.f, 50.f }))
-        {
-            searchInput = "";
-            searchResult = "";
-            searchInputActive = false;
-            clearHighlights(visualRoot);
-        }
-        else
-        {
-            searchInputActive = false;
+            // Back button
+            else if (isMouseOver(mousePosition, { 30.f, 620.f }, { 150.f, 50.f }))
+            {
+                searchInputActive = false;
+                currentScreen = LEVEL_INTRO;
+            }
+
+            // Reset button
+            else if (isMouseOver(mousePosition, { 600.f, 620.f }, { 150.f, 50.f }))
+            {
+                searchInput = "";
+                searchResult = "";
+                searchInputActive = false;
+                clearHighlights(visualRoot);
+            }
+            else
+            {
+                searchInputActive = false;
+            }
         }
     }
 
@@ -339,6 +567,7 @@ void Game::handleMouseClick(Vector2i mousePosition)
         }
     }
 }
+
 
 
 // Check whether mouse is inside a button
@@ -373,7 +602,10 @@ void Game::drawCampaignMap()
 
     float centerX = static_cast<float>(window.getSize().x) / 2.f;
 
-    drawButton("ACT 2 - BST", { centerX - 150.f, 300.f }, { 300.f, 65.f });
+    drawButton("ACT 2 - BST", { centerX - 150.f, 270.f }, { 300.f, 65.f });
+
+    drawButton("ACT 4 - HEAP FORTRESS", { centerX - 150.f, 370.f }, { 300.f, 65.f });
+
     drawButton("BACK", { 30.f, 600.f }, { 150.f, 50.f });
 }
 
@@ -381,8 +613,16 @@ void Game::drawCampaignMap()
 // Draw level selection
 void Game::drawLevelSelect()
 {
-    drawCenteredText("BINARY SEARCH TREE", 90.f, 40);
-    drawCenteredText("SELECT A LEVEL", 155.f, 25);
+    if (selectedAct == 2)
+    {
+        drawCenteredText("ACT 2 - SORTED WING", 100.f, 40);
+    }
+    else if (selectedAct == 4)
+    {
+        drawCenteredText("ACT 4 - HEAP FORTRESS", 100.f, 40);
+    }
+
+    drawCenteredText("Choose a level", 180.f, 22);
 
     float centerX = static_cast<float>(window.getSize().x) / 2.f;
 
@@ -400,47 +640,47 @@ void Game::drawLevelSelect()
 // Draw level introduction
 void Game::drawLevelIntro()
 {
-    drawCenteredText("LEVEL INTRODUCTION", 80.f, 40);
-
-    string mission;
-    string description;
-
-    if (selectedLevel == 1)
-    {
-        mission = "THE FIRST SEARCH";
-        description = "Find the target value in the BST.";
-    }
-    else if (selectedLevel == 2)
-    {
-        mission = "INSERTION";
-        description = "Insert the required value into the BST.";
-    }
-    else if (selectedLevel == 3)
-    {
-        mission = "DELETION";
-        description = "Remove the required value from the BST.";
-    }
-    else if (selectedLevel == 4)
-    {
-        mission = "TREE TRAVERSAL";
-        description = "Follow the correct traversal order.";
-    }
-    else if (selectedLevel == 5)
-    {
-        mission = "BST CHALLENGE";
-        description = "Complete the binary search tree challenge.";
-    }
-    else
-    {
-        mission = "UNKNOWN LEVEL";
-        description = "No level information available.";
-    }
-
-    drawCenteredText("LEVEL " + to_string(selectedLevel), 180.f, 30);
-    drawCenteredText(mission, 250.f, 28);
-    drawCenteredText(description, 320.f, 21);
-
     float centerX = static_cast<float>(window.getSize().x) / 2.f;
+
+    if (selectedAct == 4)
+    {
+        drawCenteredText("ACT 4 - HEAP FORTRESS", 100.f, 38);
+
+        if (selectedLevel == 1)
+        {
+            drawCenteredText("LEVEL 1 - ACTIVATE THE VAULT", 200.f, 28);
+            drawCenteredText("Build a Max Heap from the given array.", 270.f, 20);
+            drawCenteredText("Every parent must be greater than or equal to its children.", 310.f, 18);
+        }
+        else if (selectedLevel == 2)
+        {
+            drawCenteredText("LEVEL 2 - REPAIR THE SECURITY LOCKS", 200.f, 28);
+            drawCenteredText("Restore the Max Heap property.", 270.f, 20);
+            drawCenteredText("Use heapify to repair the disturbed heap.", 310.f, 18);
+        }
+        else if (selectedLevel == 3)
+        {
+            drawCenteredText("LEVEL 3 - EXTRACT GREATEST TREASURE", 200.f, 28);
+            drawCenteredText("Repeatedly extract the maximum element.", 270.f, 20);
+            drawCenteredText("Restore the heap after every extraction.", 310.f, 18);
+        }
+        else if (selectedLevel == 4)
+        {
+            drawCenteredText("LEVEL 4 - RACE AGAINST GUARDS", 200.f, 28);
+            drawCenteredText("Perform heap operations within the allowed limits.", 270.f, 20);
+            drawCenteredText("Complete the challenge efficiently.", 310.f, 18);
+        }
+        else if (selectedLevel == 5)
+        {
+            drawCenteredText("LEVEL 5 - FINAL VAULT", 200.f, 28);
+            drawCenteredText("Complete Heap Sort.", 270.f, 20);
+            drawCenteredText("Arrange the final array in ascending order.", 310.f, 18);
+        }
+    }
+    else if (selectedAct == 2)
+    {
+        // Keep your existing Act 2 BST introduction here.
+    }
 
     drawButton("START LEVEL", { centerX - 150.f, 450.f }, { 300.f, 60.f });
     drawButton("BACK", { 30.f, 600.f }, { 150.f, 50.f });
@@ -965,5 +1205,283 @@ void Game::performPredecessor()
     else
     {
         searchResult = "No predecessor found!";
+    }
+}
+
+VisualNode* Game::convertHeapToVisualTree(int index)
+{
+    int value;
+
+    if (!maxHeap.getValueAt(index, &value))
+    {
+        return nullptr;
+    }
+
+    VisualNode* node = new VisualNode;
+
+    node->value = value;
+
+    node->left = convertHeapToVisualTree(2 * index + 1);
+    node->right = convertHeapToVisualTree(2 * index + 2);
+
+    return node;
+}
+
+void Game::rebuildHeapVisualTree()
+{
+    deleteHeapVisualTree(heapVisualRoot);
+
+    heapVisualRoot = convertHeapToVisualTree(0);
+
+    float width = static_cast<float>(window.getSize().x);
+
+    layoutEngine.calculatePositions(heapVisualRoot, width * 0.5f, 200.f, 90.f);
+
+    shiftTree(heapVisualRoot, width * 0.25f);
+}
+
+void Game::deleteHeapVisualTree(VisualNode* node)
+{
+    if (node == nullptr)
+    {
+        return;
+    }
+
+    deleteHeapVisualTree(node->left);
+    deleteHeapVisualTree(node->right);
+
+    delete node;
+}
+
+void Game::drawHeapArray()
+{
+    drawText("Heap Array", Vector2f(420.f, 465.f), 24);
+
+    int totalElements = maxHeap.getSize();
+
+    float cellWidth = 70.f;
+    float cellHeight = 55.f;
+    float gap = 10.f;
+
+    float totalWidth = totalElements * cellWidth +
+        (totalElements - 1) * gap;
+
+    float startX = (window.getSize().x - totalWidth) / 2.f;
+
+    for (int i = 0; i < totalElements; i++)
+    {
+        int value;
+
+        if (maxHeap.getValueAt(i, &value))
+        {
+            float x = startX + i * (cellWidth + gap);
+
+            RectangleShape cell(Vector2f(cellWidth, cellHeight));
+
+            cell.setPosition(Vector2f(x, 505.f));
+            if (selectedHeapIndex == i)
+            {
+                cell.setFillColor(Color(180, 120, 40));
+            }
+            else
+            {
+                cell.setFillColor(Color(45, 55, 75));
+            }
+            cell.setOutlineColor(Color::White);
+            cell.setOutlineThickness(2.f);
+
+            window.draw(cell);
+
+            drawText(to_string(value), Vector2f(x + 20.f, 515.f), 22);
+
+            drawText(to_string(i), Vector2f(x + 28.f, 565.f), 16);
+        }
+    }
+}
+
+void Game::drawHeapGameplay()
+{
+    if (heapResult != "Heap Sort completed!" && heapVisualRoot != nullptr)
+    {
+        renderer.drawTree(window, heapVisualRoot);
+    }
+
+    drawHeapArray();
+    drawHeapOperations();
+    drawHeapEventLog();
+}
+
+void Game::highlightHeapNode(VisualNode* node, int targetIndex, int currentIndex)
+{
+    if (node == nullptr)
+    {
+        return;
+    }
+
+    if (currentIndex == targetIndex)
+    {
+        node->highlighted = true;
+        return;
+    }
+
+    node->highlighted = false;
+
+    highlightHeapNode(node->left, targetIndex, 2 * currentIndex + 1);
+    highlightHeapNode(node->right, targetIndex, 2 * currentIndex + 2);
+}
+
+void Game::drawHeapOperations()
+{
+    drawText("Heap Operations", Vector2f(760.f, 180.f), 24);
+
+    if (selectedLevel == 1)
+    {
+        drawButton("Build Max Heap", { 760.f, 230.f }, { 200.f, 40.f });
+        drawButton("Undo", { 760.f, 280.f }, { 95.f, 40.f });
+        drawButton("Replay", { 865.f, 280.f }, { 95.f, 40.f });
+    }
+    else if (selectedLevel == 2)
+    {
+        drawButton("Heapify", { 760.f, 230.f }, { 200.f, 40.f });
+        drawButton("Undo", { 760.f, 280.f }, { 95.f, 40.f });
+        drawButton("Replay", { 865.f, 280.f }, { 95.f, 40.f });
+    }
+    else if (selectedLevel == 3)
+    {
+        drawButton("Extract Maximum", { 760.f, 230.f }, { 200.f, 40.f });
+        drawButton("Undo", { 760.f, 280.f }, { 95.f, 40.f });
+        drawButton("Replay", { 865.f, 280.f }, { 95.f, 40.f });
+    }
+    else if (selectedLevel == 4)
+    {
+        drawButton("Extract Maximum", { 760.f, 230.f }, { 200.f, 40.f });
+        drawButton("Undo", { 760.f, 280.f }, { 95.f, 40.f });
+        drawButton("Replay", { 865.f, 280.f }, { 95.f, 40.f });
+    }
+    else if (selectedLevel == 5)
+    {
+        drawButton("Heap Sort", { 760.f, 230.f }, { 200.f, 40.f });
+        drawButton("Undo", { 760.f, 280.f }, { 95.f, 40.f });
+        drawButton("Replay", { 865.f, 280.f }, { 95.f, 40.f });
+    }
+
+    drawText(heapResult, Vector2f(760.f, 350.f), 16);
+
+    drawText("Enter value:", Vector2f(760.f, 410.f), 16);
+    drawPanel(Vector2f(760.f, 435.f), Vector2f(200.f, 35.f));
+    drawText(heapInput, Vector2f(770.f, 440.f), 18);
+
+    drawButton("Insert", { 760.f, 480.f }, { 200.f, 40.f });
+
+    drawButton("Reset Level", { 760.f, 535.f }, { 200.f, 40.f });
+}
+
+void Game::loadHeapLevel()
+{
+    if (selectedLevel == 1)
+    {
+        int values[] = { 10, 40, 30, 5, 20, 15 };
+        maxHeap.loadArray(values, 6);
+    }
+    else if (selectedLevel == 2)
+    {
+        int values[] = { 50, 30, 40, 60, 20, 10 };
+        maxHeap.loadArray(values, 6);
+    }
+    else if (selectedLevel == 3)
+    {
+        int values[] = { 90, 70, 80, 20, 50, 60 };
+        maxHeap.loadArray(values, 6);
+    }
+    else if (selectedLevel == 4)
+    {
+        int values[] = { 100, 60, 90, 20, 50, 70 };
+        maxHeap.loadArray(values, 6);
+    }
+    else if (selectedLevel == 5)
+    {
+        int values[] = { 45, 20, 35, 10, 15, 30 };
+        maxHeap.loadArray(values, 6);
+    }
+
+    rebuildHeapVisualTree();
+}
+
+void Game::saveHeapState()
+{
+    delete[] previousHeapState;
+
+    previousHeapSize = maxHeap.getSize();
+
+    previousHeapState = new int[previousHeapSize];
+
+    for (int i = 0; i < previousHeapSize; i++)
+    {
+        maxHeap.getValueAt(i, &previousHeapState[i]);
+    }
+
+    canUndo = true;
+}
+
+void Game::undoHeapOperation()
+{
+    if (!canUndo)
+    {
+        heapResult = "Nothing to undo!";
+        return;
+    }
+
+    maxHeap.loadArray(previousHeapState, previousHeapSize);
+
+    rebuildHeapVisualTree();
+
+    selectedHeapIndex = -1;
+
+    heapResult = "Operation undone!";
+
+    canUndo = false;
+}
+
+void Game::replayHeapLevel()
+{
+    loadHeapLevel();
+
+    selectedHeapIndex = -1;
+
+    heapInput = "";
+    heapResult = "";
+    heapInputActive = false;
+
+    heapEventCount = 0;
+    canUndo = false;
+}
+
+void Game::addHeapEvent(string event)
+{
+    if (heapEventCount < 6)
+    {
+        heapEvents[heapEventCount] = event;
+        heapEventCount++;
+    }
+    else
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            heapEvents[i] = heapEvents[i + 1];
+        }
+
+        heapEvents[5] = event;
+    }
+}
+
+void Game::drawHeapEventLog()
+{
+    drawText("EVENT LOG", Vector2f(30.f, 590.f), 20);
+
+    drawPanel(Vector2f(30.f, 620.f), Vector2f(680.f, 65.f));
+
+    for (int i = 0; i < heapEventCount; i++)
+    {
+        drawText(heapEvents[i], Vector2f(40.f + i * 110.f, 642.f), 13);
     }
 }
