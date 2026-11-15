@@ -19,5 +19,10 @@ public:
 	BST();
 	void insert(int value);
 	bool search( int target, int path[], int* pathlength);
+	bool deleteValue(int value);
+	bool findMinimum(int* minimumValue);
+	bool findMaximum(int* maximumValue);
+	bool findSuccessor(int value, int* successorValue);
+	bool findPredecessor(int value, int* predecessorValue);
 	Node* getRoot();
 };

@@ -254,17 +254,52 @@ void Game::handleMouseClick(Vector2i mousePosition)
         }
 
         // Search button
-        else if (isMouseOver(mousePosition, { width - 230.f, 260.f }, { 190.f, 45.f }))
+        else if (isMouseOver(mousePosition, { width - 230.f, 260.f }, { 190.f, 38.f }))
         {
             searchInputActive = false;
             performSearch();
         }
 
         // Insert button
-        else if (isMouseOver(mousePosition, { width - 230.f, 315.f }, { 190.f, 45.f }))
+        else if (isMouseOver(mousePosition, { width - 230.f, 305.f }, { 190.f, 38.f }))
         {
             searchInputActive = false;
             performInsert();
+        }
+
+        // Delete button
+        else if (isMouseOver(mousePosition, { width - 230.f, 350.f }, { 190.f, 38.f }))
+        {
+            searchInputActive = false;
+            performDelete();
+        }
+
+        // Minimum button
+        else if (isMouseOver(mousePosition, { width - 230.f, 395.f }, { 190.f, 38.f }))
+        {
+            searchInputActive = false;
+            performMinimum();
+        }
+
+        // Maximum button
+        else if (isMouseOver(mousePosition, { width - 230.f, 440.f }, { 190.f, 38.f }))
+        {
+            searchInputActive = false;
+            performMaximum();
+        }
+
+        // Successor
+        else if (isMouseOver(mousePosition, { width - 230.f, 450.f }, { 190.f, 34.f }))
+        {
+            searchInputActive = false;
+            performSuccessor();
+        }
+
+        // Predecessor
+        else if (isMouseOver(mousePosition, { width - 230.f, 488.f }, { 190.f, 34.f }))
+        {
+            searchInputActive = false;
+            performPredecessor();
         }
 
         // Back button
@@ -428,6 +463,10 @@ void Game::drawGameplay()
 
     drawText("MISSION", { 40.f, 120.f }, 25);
 
+    //drawText("EVENT LOG", { width - 230.f, 430.f }, 20);
+
+    //drawText(searchResult, { width - 230.f, 465.f }, 15);
+
     if (selectedLevel == 1)
     {
         drawText("Find the target", { 40.f, 175.f }, 18);
@@ -495,11 +534,17 @@ void Game::drawGameplay()
         drawText(searchInput, { width - 220.f, 215.f }, 18);
     }
 
-    drawButton("SEARCH", { width - 230.f, 260.f }, { 190.f, 45.f });
-    drawButton("INSERT", { width - 230.f, 315.f }, { 190.f, 45.f });
+    drawButton("SEARCH", { width - 230.f, 260.f }, { 190.f, 34.f });
+    drawButton("INSERT", { width - 230.f, 298.f }, { 190.f, 34.f });
+    drawButton("DELETE", { width - 230.f, 336.f }, { 190.f, 34.f });
+    drawButton("MINIMUM", { width - 230.f, 374.f }, { 190.f, 34.f });
+    drawButton("MAXIMUM", { width - 230.f, 412.f }, { 190.f, 34.f });
+    drawButton("SUCCESSOR", { width - 230.f, 450.f }, { 190.f, 34.f });
+    drawButton("PREDECESSOR", { width - 230.f, 488.f }, { 190.f, 34.f });
 
-    // Event log
-    drawText("EVENT LOG", { width - 230.f, 390.f }, 21);
+    drawText("EVENT LOG", { width - 230.f, 530.f }, 16);
+
+    drawText(searchResult, { width - 230.f, 552.f }, 13);
 
     if (searchResult.empty())
     {
@@ -810,4 +855,115 @@ void Game::performInsert()
     highlightNode(visualRoot, value);
 
     searchResult = "Successfully inserted!";
+}
+
+void Game::performDelete()
+{
+    if (searchInput.empty())
+    {
+        searchResult = "Enter a value first.";
+        return;
+    }
+
+    int value = stoi(searchInput);
+
+    clearHighlights(visualRoot);
+
+    bool deleted = bst.deleteValue(value);
+
+    if (deleted)
+    {
+        rebuildVisualTree();
+        searchResult = "Successfully deleted!";
+    }
+    else
+    {
+        searchResult = "Value not found!";
+    }
+}
+
+void Game::performMinimum()
+{
+    int minimumValue;
+
+    clearHighlights(visualRoot);
+
+    if (bst.findMinimum(&minimumValue))
+    {
+        highlightNode(visualRoot, minimumValue);
+
+        searchResult = "Minimum: " + to_string(minimumValue);
+    }
+    else
+    {
+        searchResult = "Tree is empty!";
+    }
+}
+
+void Game::performMaximum()
+{
+    int maximumValue;
+
+    clearHighlights(visualRoot);
+
+    if (bst.findMaximum(&maximumValue))
+    {
+        highlightNode(visualRoot, maximumValue);
+
+        searchResult = "Maximum: " + to_string(maximumValue);
+    }
+    else
+    {
+        searchResult = "Tree is empty!";
+    }
+}
+
+void Game::performSuccessor()
+{
+    if (searchInput.empty())
+    {
+        searchResult = "Enter a value first.";
+        return;
+    }
+
+    int value = stoi(searchInput);
+    int successorValue;
+
+    clearHighlights(visualRoot);
+
+    if (bst.findSuccessor(value, &successorValue))
+    {
+        highlightNode(visualRoot, successorValue);
+
+        searchResult = "Successor: " + to_string(successorValue);
+    }
+    else
+    {
+        searchResult = "No successor found!";
+    }
+}
+
+void Game::performPredecessor()
+{
+    if (searchInput.empty())
+    {
+        searchResult = "Enter a value first.";
+        return;
+    }
+
+    int value = stoi(searchInput);
+    int predecessorValue;
+
+    clearHighlights(visualRoot);
+
+    if (bst.findPredecessor(value, &predecessorValue))
+    {
+        highlightNode(visualRoot, predecessorValue);
+
+        searchResult = "Predecessor: " + to_string(predecessorValue);
+    }
+    else
+    {
+        searchResult = "No predecessor found!";
+    }
 }

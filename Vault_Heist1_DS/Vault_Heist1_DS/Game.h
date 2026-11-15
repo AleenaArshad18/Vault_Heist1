@@ -57,6 +57,11 @@ private:
     // Search functionality
     void performSearch();
     void performInsert();
+    void performDelete();
+    void performMinimum();
+    void performMaximum();
+    void performSuccessor();
+    void performPredecessor();
     void clearHighlights(VisualNode* node);
     void highlightNode(VisualNode* node, int value);
 

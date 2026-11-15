@@ -71,3 +71,230 @@ bool BST::search(int target, int path[], int* pathlength) {
 Node* BST::getRoot() {
     return root;
 }
+
+bool BST::deleteValue(int value) {
+
+    Node* current = root;
+    Node* previous = nullptr;
+
+    // Find the node to delete
+    while (current != nullptr && current->data != value) {
+
+        previous = current;
+
+        if (value < current->data) {
+            current = current->left;
+        }
+        else {
+            current = current->right;
+        }
+    }
+
+    // Value does not exist
+    if (current == nullptr) {
+        return false;
+    }
+
+    // CASE 1: Node has no children (leaf node)
+    if (current->left == nullptr && current->right == nullptr) {
+
+        if (previous == nullptr) {
+            root = nullptr;
+        }
+        else if (current == previous->left) {
+            previous->left = nullptr;
+        }
+        else {
+            previous->right = nullptr;
+        }
+
+        delete current;
+    }
+
+    // CASE 2: Node has only one child
+    else if (current->left == nullptr || current->right == nullptr) {
+
+        Node* grandchild;
+
+        if (current->right == nullptr) {
+            grandchild = current->left;
+        }
+        else {
+            grandchild = current->right;
+        }
+
+        if (previous == nullptr) {
+            root = grandchild;
+        }
+        else if (current == previous->left) {
+            previous->left = grandchild;
+        }
+        else {
+            previous->right = grandchild;
+        }
+
+        delete current;
+    }
+
+    // CASE 3: Node has two children
+    else {
+
+        Node* successor = current->right;
+        Node* successorPrevious = current;
+
+        // Find the inorder successor
+        while (successor->left != nullptr) {
+
+            successorPrevious = successor;
+            successor = successor->left;
+        }
+
+        // Copy successor's value into current node
+        current->data = successor->data;
+
+        // Remove the successor from its original position
+        if (successorPrevious->left == successor) {
+            successorPrevious->left = successor->right;
+        }
+        else {
+            successorPrevious->right = successor->right;
+        }
+
+        delete successor;
+    }
+
+    return true;
+}
+
+bool BST::findMinimum(int* minimumValue)
+{
+    if (root == nullptr)
+    {
+        return false;
+    }
+
+    Node* temp = root;
+
+    while (temp->left != nullptr)
+    {
+        temp = temp->left;
+    }
+
+    *minimumValue = temp->data;
+
+    return true;
+}
+
+bool BST::findMaximum(int* maximumValue)
+{
+    if (root == nullptr)
+    {
+        return false;
+    }
+
+    Node* temp = root;
+
+    while (temp->right != nullptr)
+    {
+        temp = temp->right;
+    }
+
+    *maximumValue = temp->data;
+
+    return true;
+}
+
+bool BST::findSuccessor(int value, int* successorValue)
+{
+    Node* current = root;
+    Node* successor = nullptr;
+
+    // Find the target node
+    while (current != nullptr && current->data != value)
+    {
+        if (value < current->data)
+        {
+            successor = current;
+            current = current->left;
+        }
+        else
+        {
+            current = current->right;
+        }
+    }
+
+    // Target value does not exist
+    if (current == nullptr)
+    {
+        return false;
+    }
+
+    // If right subtree exists, find its smallest value
+    if (current->right != nullptr)
+    {
+        successor = current->right;
+
+        while (successor->left != nullptr)
+        {
+            successor = successor->left;
+        }
+    }
+
+    // No successor exists
+    if (successor == nullptr)
+    {
+        return false;
+    }
+
+    *successorValue = successor->data;
+
+    return true;
+}
+
+bool BST::findPredecessor(int value, int* predecessorValue)
+{
+    Node* current = root;
+    Node* predecessor = nullptr;
+
+    // Find the target node
+    while (current != nullptr && current->data != value)
+    {
+        if (value > current->data)
+        {
+            predecessor = current;
+            current = current->right;
+        }
+        else
+        {
+            current = current->left;
+        }
+    }
+
+    // Target value does not exist
+    if (current == nullptr)
+    {
+        return false;
+    }
+
+    // If left subtree exists, find its largest value
+    if (current->left != nullptr)
+    {
+        predecessor = current->left;
+
+        while (predecessor->right != nullptr)
+        {
+            predecessor = predecessor->right;
+        }
+    }
+
+    // No predecessor exists
+    if (predecessor == nullptr)
+    {
+        return false;
+    }
+
+    *predecessorValue = predecessor->data;
+
+    return true;
+}
+
