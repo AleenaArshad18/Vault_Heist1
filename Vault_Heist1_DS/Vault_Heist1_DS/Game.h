@@ -7,6 +7,7 @@
 #include "LayoutEngine.h"
 #include "Renderer.h"
 #include "BST.h"
+#include "MaxHeap.h"
 
 using namespace sf;
 using namespace std;
@@ -16,7 +17,8 @@ class Game
 public:
     Game();
     void run();
-
+    ~Game();
+    //
 private:
     static const int MAIN_MENU = 0;
     static const int CAMPAIGN_MAP = 1;
@@ -46,6 +48,10 @@ private:
     void drawText(const std::string& text, Vector2f position, unsigned int fontSize);
     void drawPanel(Vector2f position, Vector2f size);
 
+    void drawHeapGameplay();
+    void drawHeapArray();
+    void drawHeapOperations();
+
     void positionGameplayTree();
     void shiftTree(VisualNode* node, float offsetX);
 
@@ -54,9 +60,18 @@ private:
     void rebuildVisualTree();
     void deleteVisualTree(VisualNode* node);
 
+    VisualNode* convertHeapToVisualTree(int index);
+    void rebuildHeapVisualTree();
+    void deleteHeapVisualTree(VisualNode* node);
+
     // Search functionality
     void performSearch();
     void performInsert();
+    void performDelete();
+    void performMinimum();
+    void performMaximum();
+    void performSuccessor();
+    void performPredecessor();
     void clearHighlights(VisualNode* node);
     void highlightNode(VisualNode* node, int value);
 
@@ -72,6 +87,7 @@ private:
     // Screen navigation
     int currentScreen = MAIN_MENU;
     int selectedLevel = 0;
+    int selectedAct = 2;
 
     // Actual BST
     BST bst;
@@ -83,4 +99,34 @@ private:
     string searchInput = "";
     string searchResult = "";
     bool searchInputActive = false;
+
+    // Actual Max Heap
+    MaxHeap maxHeap;
+
+    // Visual copy of Max Heap
+    VisualNode* heapVisualRoot = nullptr;
+
+    // Heap array display
+    int selectedHeapIndex = -1;
+
+    void highlightHeapNode(VisualNode* node, int targetIndex, int currentIndex = 0);
+    void loadHeapLevel();
+
+    string heapInput = "";
+    string heapResult = "";
+    bool heapInputActive = false;
+
+    int* previousHeapState = nullptr;
+    int previousHeapSize = 0;
+    bool canUndo = false;
+
+    void saveHeapState();
+    void undoHeapOperation();
+    void replayHeapLevel();
+
+    string heapEvents[6];
+    int heapEventCount = 0;
+
+    void addHeapEvent(string event);
+    void drawHeapEventLog();
 };
