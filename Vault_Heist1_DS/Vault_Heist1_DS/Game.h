@@ -2,7 +2,8 @@
 
 #include <SFML/Graphics.hpp>
 #include <string>
-
+#include "BinaryTree.h"
+#include "AVLTree.h"
 #include "VisualNode.h"
 #include "LayoutEngine.h"
 #include "Renderer.h"
@@ -43,6 +44,9 @@ private:
     void drawGameplay();
     void drawPlaceholder(const std::string& title, const std::string& message);
 
+    void drawBinaryGameplay();
+    void drawAVLGameplay();
+
     void drawButton(const std::string& text, Vector2f position, Vector2f size, bool enabled = true);
     void drawCenteredText(const std::string& text, float y, unsigned int fontSize);
     void drawText(const std::string& text, Vector2f position, unsigned int fontSize);
@@ -63,6 +67,14 @@ private:
     VisualNode* convertHeapToVisualTree(int index);
     void rebuildHeapVisualTree();
     void deleteHeapVisualTree(VisualNode* node);
+
+    // Binary Tree visual connection
+    VisualNode* convertBinaryToVisualTree(Node* node);
+    void rebuildBinaryVisualTree();
+
+    // AVL Tree visual connection
+    VisualNode* convertAVLToVisualTree(AVLNode* node);
+    void rebuildAVLVisualTree();
 
     // Search functionality
     void performSearch();
@@ -94,6 +106,13 @@ private:
 
     // Visual copy of BST
     VisualNode* visualRoot = nullptr;
+    // ACT 1 - Binary Tree
+    BinaryTree binaryTree;
+    VisualNode* binaryVisualRoot = nullptr;
+
+    // ACT 3 - AVL Tree
+    AVLTree avlTree;
+    VisualNode* avlVisualRoot = nullptr;
 
     // Search input and result
     string searchInput = "";

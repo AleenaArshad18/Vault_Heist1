@@ -16,10 +16,27 @@ Game::Game() : maxHeap(10)
     maxHeap.insert(10);
     maxHeap.insert(20);
 
-    rebuildHeapVisualTree();
+
+
+    // ACT 1 - Binary Tree
+    int binaryPre[] = { 1, 2, 4, 5, 3 };
+    int binaryIn[] = { 4, 2, 5, 1, 3 };
+
+    binaryTree.buildFromPreorderInorder(binaryPre, binaryIn, 5);
+
+    // ACT 3 - AVL Tree
+    avlTree.insert(50);
+    avlTree.insert(30);
+    avlTree.insert(70);
+    avlTree.insert(20);
+    avlTree.insert(40);
+    avlTree.insert(60);
+    avlTree.insert(80);
 
     window.create(VideoMode({ 1000u, 700u }), "Vault Heist: The Living Vault");
     window.setFramerateLimit(60);
+
+    rebuildHeapVisualTree();
 
     uiFontLoaded = uiFont.openFromFile("assets/fonts/BrownieStencil.ttf");
 
@@ -37,10 +54,12 @@ Game::Game() : maxHeap(10)
     bst.insert(60);
     bst.insert(80);
 
-    // Create visual copy of the BST
+    // Create visual copies of all trees
     rebuildVisualTree();
+    rebuildBinaryVisualTree();
+    rebuildAVLVisualTree();
 
-    positionGameplayTree();
+    positionGameplayTree();;
 }
 
 
@@ -60,6 +79,8 @@ Game::~Game()
     delete[] previousHeapState;
     deleteVisualTree(visualRoot);
     deleteHeapVisualTree(heapVisualRoot);
+    deleteVisualTree(binaryVisualRoot);
+    deleteVisualTree(avlVisualRoot);
 }
 
 // Process window events
@@ -96,9 +117,17 @@ void Game::processEvents()
 
             window.setView(View(FloatRect({ 0.f, 0.f }, { width, height })));
 
+
             if (currentScreen == GAMEPLAY)
             {
-                positionGameplayTree();
+                if (selectedAct == 1)
+                    rebuildBinaryVisualTree();
+                else if (selectedAct == 2)
+                    positionGameplayTree();
+                else if (selectedAct == 3)
+                    rebuildAVLVisualTree();
+                else if (selectedAct == 4)
+                    rebuildHeapVisualTree();
             }
             else
             {
@@ -177,9 +206,17 @@ void Game::render()
     }
     else if (currentScreen == GAMEPLAY)
     {
-        if (selectedAct == 2)
+        if (selectedAct == 1)
+        {
+            drawBinaryGameplay();
+        }
+        else if (selectedAct == 2)
         {
             drawGameplay();
+        }
+        else if (selectedAct == 3)
+        {
+            drawAVLGameplay();
         }
         else if (selectedAct == 4)
         {
@@ -224,23 +261,33 @@ void Game::handleMouseClick(Vector2i mousePosition)
 
     else if (currentScreen == CAMPAIGN_MAP)
     {
-        // Act 2 - BST
-        if (isMouseOver(mousePosition, { centerX - 150.f, 270.f }, { 300.f, 65.f }))
-        {
+        if (isMouseOver(mousePosition,
+            { centerX - 150.f, 210.f }, { 300.f, 60.f }))
+        { // act 1
+            selectedAct = 1;
+            currentScreen = LEVEL_SELECT;
+        }
+        else if (isMouseOver(mousePosition,
+            { centerX - 150.f, 290.f }, { 300.f, 60.f }))
+        { //act 2 
             selectedAct = 2;
             currentScreen = LEVEL_SELECT;
         }
-
-        // Act 4 - Heap Fortress
-        else if (isMouseOver(mousePosition, { centerX - 150.f, 370.f }, { 300.f, 65.f }))
-        {
+        else if (isMouseOver(mousePosition,
+            { centerX - 150.f, 370.f }, { 300.f, 60.f }))
+        { //act  3
+            selectedAct = 3;
+            currentScreen = LEVEL_SELECT;
+        }
+        else if (isMouseOver(mousePosition,
+            { centerX - 150.f, 450.f }, { 300.f, 60.f }))
+        { // act 4
             selectedAct = 4;
             currentScreen = LEVEL_SELECT;
         }
-
-        // Back button
-        else if (isMouseOver(mousePosition, { 30.f, 600.f }, { 150.f, 50.f }))
-        {
+        else if (isMouseOver(mousePosition,
+            { 30.f, 600.f }, { 150.f, 50.f }))
+        { // back button
             currentScreen = MAIN_MENU;
         }
     }
@@ -304,6 +351,16 @@ void Game::handleMouseClick(Vector2i mousePosition)
                 canUndo = false;
 
                 loadHeapLevel();
+            }
+            else if (selectedAct == 1)
+            {
+                clearHighlights(binaryVisualRoot);
+                rebuildBinaryVisualTree();
+            }
+            else if (selectedAct == 3)
+            {
+                clearHighlights(avlVisualRoot);
+                rebuildAVLVisualTree();
             }
         }
 
@@ -549,6 +606,14 @@ void Game::handleMouseClick(Vector2i mousePosition)
                 searchInputActive = false;
             }
         }
+
+        else if (selectedAct == 1 || selectedAct == 3)
+        {
+            if (isMouseOver(mousePosition, { 30.f, 620.f }, { 150.f, 50.f }))
+            {
+                currentScreen = LEVEL_INTRO;
+            }
+        }
     }
 
     else if (currentScreen == SANDBOX)
@@ -597,22 +662,37 @@ void Game::drawMainMenu()
 // Draw campaign map
 void Game::drawCampaignMap()
 {
-    drawCenteredText("CAMPAIGN MAP", 100.f, 45);
-    drawCenteredText("Choose an act to continue", 180.f, 22);
+    drawCenteredText("CAMPAIGN MAP", 90.f, 45);
+    drawCenteredText("Choose an act to continue", 150.f, 22);
 
     float centerX = static_cast<float>(window.getSize().x) / 2.f;
 
-    drawButton("ACT 2 - BST", { centerX - 150.f, 270.f }, { 300.f, 65.f });
+    drawButton("ACT 1 - BINARY TREE",
+        { centerX - 150.f, 210.f }, { 300.f, 60.f });
 
-    drawButton("ACT 4 - HEAP FORTRESS", { centerX - 150.f, 370.f }, { 300.f, 65.f });
+    drawButton("ACT 2 - BST",
+        { centerX - 150.f, 290.f }, { 300.f, 60.f });
+
+    drawButton("ACT 3 - AVL TREE",
+        { centerX - 150.f, 370.f }, { 300.f, 60.f });
+
+    drawButton("ACT 4 - HEAP FORTRESS",
+        { centerX - 150.f, 450.f }, { 300.f, 60.f });
 
     drawButton("BACK", { 30.f, 600.f }, { 150.f, 50.f });
 }
 
-
 // Draw level selection
 void Game::drawLevelSelect()
 {
+    if (selectedAct == 1)
+    {
+        drawCenteredText("ACT 1 - BINARY TREE", 100.f, 40);
+    }
+    else if (selectedAct == 3)
+    {
+        drawCenteredText("ACT 3 - AVL TREE", 100.f, 40);
+    }
     if (selectedAct == 2)
     {
         drawCenteredText("ACT 2 - SORTED WING", 100.f, 40);
@@ -641,7 +721,20 @@ void Game::drawLevelSelect()
 void Game::drawLevelIntro()
 {
     float centerX = static_cast<float>(window.getSize().x) / 2.f;
-
+    if (selectedAct == 1)
+    {
+        drawCenteredText("ACT 1 - BINARY TREE", 100.f, 38);
+        drawCenteredText("LEVEL " + to_string(selectedLevel), 200.f, 28);
+        drawCenteredText("Explore binary tree traversals and operations.", 270.f, 20);
+        drawCenteredText("Understand how nodes are connected.", 310.f, 18);
+    }
+    else if (selectedAct == 3)
+    {
+        drawCenteredText("ACT 3 - AVL TREE", 100.f, 38);
+        drawCenteredText("LEVEL " + to_string(selectedLevel), 200.f, 28);
+        drawCenteredText("Maintain a height-balanced search tree.", 270.f, 20);
+        drawCenteredText("Explore rotations, insertion and deletion.", 310.f, 18);
+    }
     if (selectedAct == 4)
     {
         drawCenteredText("ACT 4 - HEAP FORTRESS", 100.f, 38);
@@ -951,6 +1044,37 @@ VisualNode* Game::convertToVisualTree(Node* node)
 }
 
 
+// ACT 1 - Binary Tree
+VisualNode* Game::convertBinaryToVisualTree(Node* node)
+{
+    if (node == nullptr)
+        return nullptr;
+
+    VisualNode* visualNode = new VisualNode;
+    visualNode->value = node->data;
+
+    visualNode->left = convertBinaryToVisualTree(node->left);
+    visualNode->right = convertBinaryToVisualTree(node->right);
+
+    return visualNode;
+}
+
+
+// ACT 3 - AVL Tree
+VisualNode* Game::convertAVLToVisualTree(AVLNode* node)
+{
+    if (node == nullptr)
+        return nullptr;
+
+    VisualNode* visualNode = new VisualNode;
+    visualNode->value = node->data;
+
+    visualNode->left = convertAVLToVisualTree(node->left);
+    visualNode->right = convertAVLToVisualTree(node->right);
+
+    return visualNode;
+}
+
 // Delete visual tree to release its allocated memory
 void Game::deleteVisualTree(VisualNode* node)
 {
@@ -977,6 +1101,31 @@ void Game::rebuildVisualTree()
 }
 
 
+
+void Game::rebuildBinaryVisualTree()
+{
+    deleteVisualTree(binaryVisualRoot);
+
+    binaryVisualRoot = convertBinaryToVisualTree(binaryTree.getRoot());
+
+    float width = (float)window.getSize().x;
+
+    layoutEngine.calculatePositions(binaryVisualRoot, width * 0.5f, 200.f, 90.f);
+    shiftTree(binaryVisualRoot, width * 0.25f);
+}
+
+
+void Game::rebuildAVLVisualTree()
+{
+    deleteVisualTree(avlVisualRoot);
+
+    avlVisualRoot = convertAVLToVisualTree(avlTree.getRoot());
+
+    float width = (float)window.getSize().x;
+
+    layoutEngine.calculatePositions(avlVisualRoot, width * 0.5f, 200.f, 90.f);
+    shiftTree(avlVisualRoot, width * 0.25f);
+}
 // Clear all highlighted nodes
 void Game::clearHighlights(VisualNode* node)
 {
@@ -1484,4 +1633,73 @@ void Game::drawHeapEventLog()
     {
         drawText(heapEvents[i], Vector2f(40.f + i * 110.f, 642.f), 13);
     }
+}
+
+// ACT 1 - BINARY TREE GAMEPLAY
+void Game::drawBinaryGameplay()
+{
+    float width = static_cast<float>(window.getSize().x);
+
+    drawPanel({ 20.f, 15.f }, { width - 40.f, 65.f });
+    drawText("LEVEL " + to_string(selectedLevel), { 40.f, 35.f }, 22);
+    drawText("ACT 1 - BINARY TREE", { width - 300.f, 35.f }, 22);
+
+    drawPanel({ 20.f, 100.f }, { 230.f, 470.f });
+    drawText("MISSION", { 40.f, 120.f }, 24);
+
+    drawText("Explore the", { 40.f, 180.f }, 18);
+    drawText("Binary Tree.", { 40.f, 210.f }, 18);
+    drawText("Study its nodes", { 40.f, 270.f }, 16);
+    drawText("and connections.", { 40.f, 295.f }, 16);
+
+    drawPanel({ 270.f, 100.f }, { width - 540.f, 470.f });
+    drawText("TREE VISUALIZATION", { 290.f, 115.f }, 20);
+
+    renderer.drawTree(window, binaryVisualRoot);
+
+    drawPanel({ width - 250.f, 100.f }, { 230.f, 470.f });
+    drawText("TREE INFORMATION", { width - 230.f, 120.f }, 20);
+
+    drawText("Binary Tree", { width - 230.f, 190.f }, 18);
+    drawText("Each node has", { width - 230.f, 240.f }, 16);
+    drawText("at most two", { width - 230.f, 265.f }, 16);
+    drawText("children.", { width - 230.f, 290.f }, 16);
+
+    drawButton("BACK", { 30.f, 620.f }, { 150.f, 50.f });
+}
+
+
+// ACT 3 - AVL TREE GAMEPLAY
+void Game::drawAVLGameplay()
+{
+    float width = static_cast<float>(window.getSize().x);
+
+    drawPanel({ 20.f, 15.f }, { width - 40.f, 65.f });
+    drawText("LEVEL " + to_string(selectedLevel), { 40.f, 35.f }, 22);
+    drawText("ACT 3 - AVL TREE", { width - 250.f, 35.f }, 22);
+
+    drawPanel({ 20.f, 100.f }, { 230.f, 470.f });
+    drawText("MISSION", { 40.f, 120.f }, 24);
+
+    drawText("Explore the", { 40.f, 180.f }, 18);
+    drawText("AVL Tree.", { 40.f, 210.f }, 18);
+    drawText("Maintain the", { 40.f, 270.f }, 16);
+    drawText("balance of the", { 40.f, 295.f }, 16);
+    drawText("tree using", { 40.f, 320.f }, 16);
+    drawText("rotations.", { 40.f, 345.f }, 16);
+
+    drawPanel({ 270.f, 100.f }, { width - 540.f, 470.f });
+    drawText("TREE VISUALIZATION", { 290.f, 115.f }, 20);
+
+    renderer.drawTree(window, avlVisualRoot);
+
+    drawPanel({ width - 250.f, 100.f }, { 230.f, 470.f });
+    drawText("AVL INFORMATION", { width - 230.f, 120.f }, 20);
+
+    drawText("Height-balanced", { width - 230.f, 190.f }, 16);
+    drawText("Binary Search Tree", { width - 230.f, 220.f }, 16);
+    drawText("Balance Factor:", { width - 230.f, 280.f }, 16);
+    drawText(" -1, 0, or +1", { width - 230.f, 310.f }, 16);
+
+    drawButton("BACK", { 30.f, 620.f }, { 150.f, 50.f });
 }
