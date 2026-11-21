@@ -1,369 +1,273 @@
-
-
-
 #include "AVLTree.h"
 
-// Constructor
-AVLTree::AVLTree()
-{
-    root = nullptr;
-}
+#include <algorithm>
 
-// Destructor
+AVLTree::AVLTree() : root(nullptr), lastRotation("") {}
+
 AVLTree::~AVLTree()
 {
     clearTree(root);
 }
 
-// Get height of a node
 int AVLTree::height(AVLNode* node)
 {
-    if (node == nullptr)
-        return 0;
-
-    return node->height;
+    return node ? node->height : 0;
 }
 
-// Get size of a subtree
 int AVLTree::getSize(AVLNode* node)
 {
-    if (node == nullptr)
-        return 0;
-
-    return node->size;
+    return node ? node->size : 0;
 }
 
-// Calculate balance factor
 int AVLTree::getBalance(AVLNode* node)
 {
-    if (node == nullptr)
-        return 0;
-
-    return height(node->left) - height(node->right);
+    return node ? height(node->left) - height(node->right) : 0;
 }
 
-// Update height and size
 void AVLTree::updateNode(AVLNode* node)
 {
-    if (node == nullptr)
-        return;
-
-    int leftHeight = height(node->left);
-    int rightHeight = height(node->right);
-
-    if (leftHeight > rightHeight)
-        node->height = leftHeight + 1;
-    else
-        node->height = rightHeight + 1;
-
+    if (!node) return;
+    node->height = 1 + std::max(height(node->left), height(node->right));
     node->size = 1 + getSize(node->left) + getSize(node->right);
 }
 
-// Right Rotation (LL case)
 AVLNode* AVLTree::rotateRight(AVLNode* node)
 {
+    if (!node || !node->left) return node;
     AVLNode* newRoot = node->left;
-    AVLNode* temp = newRoot->right;
-
+    AVLNode* transfer = newRoot->right;
     newRoot->right = node;
-    node->left = temp;
-
+    node->left = transfer;
     updateNode(node);
     updateNode(newRoot);
-
     return newRoot;
 }
 
-// Left Rotation (RR case)
 AVLNode* AVLTree::rotateLeft(AVLNode* node)
 {
+    if (!node || !node->right) return node;
     AVLNode* newRoot = node->right;
-    AVLNode* temp = newRoot->left;
-
+    AVLNode* transfer = newRoot->left;
     newRoot->left = node;
-    node->right = temp;
-
+    node->right = transfer;
     updateNode(node);
     updateNode(newRoot);
-
     return newRoot;
 }
 
-// Rebalance the tree
 AVLNode* AVLTree::rebalance(AVLNode* node)
 {
-    if (node == nullptr)
-        return nullptr;
-
+    if (!node) return nullptr;
     updateNode(node);
-
     int balance = getBalance(node);
 
-    // LL Case
     if (balance > 1 && getBalance(node->left) >= 0)
+    {
+        lastRotation = "LL rotation (Right Rotation)";
         return rotateRight(node);
-
-    // LR Case
+    }
     if (balance > 1 && getBalance(node->left) < 0)
     {
+        lastRotation = "LR rotation (Left then Right)";
         node->left = rotateLeft(node->left);
         return rotateRight(node);
     }
-
-    // RR Case
     if (balance < -1 && getBalance(node->right) <= 0)
+    {
+        lastRotation = "RR rotation (Left Rotation)";
         return rotateLeft(node);
-
-    // RL Case
+    }
     if (balance < -1 && getBalance(node->right) > 0)
     {
+        lastRotation = "RL rotation (Right then Left)";
         node->right = rotateRight(node->right);
         return rotateLeft(node);
     }
-
     return node;
 }
 
-// Insert a value
 AVLNode* AVLTree::insertNode(AVLNode* node, int value)
 {
-    if (node == nullptr)
-        return new AVLNode(value);
-
-    if (value < node->data)
-        node->left = insertNode(node->left, value);
-
-    else if (value > node->data)
-        node->right = insertNode(node->right, value);
-
-    else
-        return node;  // Duplicate values not allowed
-
+    if (!node) return new AVLNode(value);
+    if (value < node->data) node->left = insertNode(node->left, value);
+    else if (value > node->data) node->right = insertNode(node->right, value);
+    else return node;
     return rebalance(node);
 }
 
-// Public insertion function
 void AVLTree::insert(int value)
 {
+    lastRotation.clear();
     root = insertNode(root, value);
 }
 
-// Find minimum node
-AVLNode* AVLTree::findMin(AVLNode* node)
+AVLNode* AVLTree::insertPlain(AVLNode* node, int value)
 {
-    while (node != nullptr && node->left != nullptr)
-        node = node->left;
-
+    if (!node) return new AVLNode(value);
+    if (value < node->data) node->left = insertPlain(node->left, value);
+    else if (value > node->data) node->right = insertPlain(node->right, value);
+    updateNode(node);
     return node;
 }
 
-// Delete a value
+void AVLTree::insertDemo(int value)
+{
+    root = insertPlain(root, value);
+}
+
+AVLNode* AVLTree::findMin(AVLNode* node)
+{
+    while (node && node->left) node = node->left;
+    return node;
+}
+
 AVLNode* AVLTree::deleteNode(AVLNode* node, int value)
 {
-    if (node == nullptr)
-        return nullptr;
-
-    if (value < node->data)
-        node->left = deleteNode(node->left, value);
-
-    else if (value > node->data)
-        node->right = deleteNode(node->right, value);
-
+    if (!node) return nullptr;
+    if (value < node->data) node->left = deleteNode(node->left, value);
+    else if (value > node->data) node->right = deleteNode(node->right, value);
     else
     {
-        // Case 1 and 2: No child or one child
-        if (node->left == nullptr || node->right == nullptr)
+        if (!node->left || !node->right)
         {
-            AVLNode* child;
-
-            if (node->left != nullptr)
-                child = node->left;
-            else
-                child = node->right;
-
+            AVLNode* child = node->left ? node->left : node->right;
             delete node;
             return child;
         }
-
-        // Case 3: Two children
         AVLNode* successor = findMin(node->right);
-
         node->data = successor->data;
-
         node->right = deleteNode(node->right, successor->data);
     }
-
     return rebalance(node);
 }
 
-// Public deletion function
 void AVLTree::remove(int value)
 {
+    lastRotation.clear();
     root = deleteNode(root, value);
 }
 
-// Get overall tree height
-int AVLTree::getHeight()
-{
-    return height(root);
-}
-
-// Get balance factor of a particular value
-int AVLTree::balanceFactor(int value)
-{
-    AVLNode* temp = root;
-
-    while (temp != nullptr)
-    {
-        if (value == temp->data)
-            return getBalance(temp);
-
-        else if (value < temp->data)
-            temp = temp->left;
-
-        else
-            temp = temp->right;
-    }
-
-    return 999; // Value not found
-}
-
-// Find kth smallest value
-int AVLTree::kthSmallest(AVLNode* node, int k)
-{
-    if (node == nullptr || k <= 0 || k > getSize(node))
-        return -1;
-
-    int leftSize = getSize(node->left);
-
-    if (k == leftSize + 1)
-        return node->data;
-
-    else if (k <= leftSize)
-        return kthSmallest(node->left, k);
-
-    else
-        return kthSmallest(node->right, k - leftSize - 1);
-}
-
-// Public kth function
-int AVLTree::kth(int k)
-{
-    return kthSmallest(root, k);
-}
-
-// Count values smaller than or equal to given value
-int AVLTree::rankValue(AVLNode* node, int value)
-{
-    if (node == nullptr)
-        return 0;
-
-    if (value < node->data)
-        return rankValue(node->left, value);
-
-    return getSize(node->left) + 1 +
-        rankValue(node->right, value);
-}
-
-// Public rank function
-int AVLTree::rank(int value)
-{
-    return rankValue(root, value);
-}
-
-// Return root
-AVLNode* AVLTree::getRoot()
-{
-    return root;
-}
-
-// Delete all nodes from memory
 void AVLTree::clearTree(AVLNode* node)
 {
-    if (node == nullptr)
-        return;
-
+    if (!node) return;
     clearTree(node->left);
     clearTree(node->right);
-
     delete node;
 }
 
-// Check whether the entire AVL tree is balanced
-bool AVLTree::checkBalanced(AVLNode* node)
+void AVLTree::reset()
 {
-    if (node == nullptr)
-        return true;
-
-    // Check left and right subtrees first
-    if (!checkBalanced(node->left))
-        return false;
-
-    if (!checkBalanced(node->right))
-        return false;
-
-    int leftHeight = height(node->left);
-    int rightHeight = height(node->right);
-
-    int expectedHeight = 1;
-
-    if (leftHeight > rightHeight)
-        expectedHeight += leftHeight;
-    else
-        expectedHeight += rightHeight;
-
-    int expectedSize = 1 +
-        getSize(node->left) +
-        getSize(node->right);
-
-    // Check stored height and size
-    if (node->height != expectedHeight)
-        return false;
-
-    if (node->size != expectedSize)
-        return false;
-
-    // Check balance factor
-    int balance = leftHeight - rightHeight;
-
-    if (balance < -1 || balance > 1)
-        return false;
-
-    return true;
+    clearTree(root);
+    root = nullptr;
+    lastRotation.clear();
 }
 
-// Public balance checking function
-bool AVLTree::isBalanced()
+int AVLTree::getHeight() { return height(root); }
+
+int AVLTree::balanceFactor(int value)
 {
-    return checkBalanced(root);
+    AVLNode* current = root;
+    while (current)
+    {
+        if (value == current->data) return getBalance(current);
+        current = value < current->data ? current->left : current->right;
+    }
+    return 999;
 }
 
-// Count values inside a given range
+int AVLTree::kthSmallest(AVLNode* node, int k)
+{
+    if (!node || k <= 0 || k > getSize(node)) return -1;
+    int leftCount = getSize(node->left);
+    if (k == leftCount + 1) return node->data;
+    if (k <= leftCount) return kthSmallest(node->left, k);
+    return kthSmallest(node->right, k - leftCount - 1);
+}
+
+int AVLTree::kth(int k) { return kthSmallest(root, k); }
+
+int AVLTree::rankValue(AVLNode* node, int value)
+{
+    if (!node) return 0;
+    if (value < node->data) return rankValue(node->left, value);
+    return getSize(node->left) + 1 + rankValue(node->right, value);
+}
+
+int AVLTree::rank(int value) { return rankValue(root, value); }
+
 int AVLTree::countRange(AVLNode* node, int low, int high)
 {
-    if (node == nullptr)
-        return 0;
-
-    // Value is smaller than the range
-    if (node->data < low)
-        return countRange(node->right, low, high);
-
-    // Value is greater than the range
-    if (node->data > high)
-        return countRange(node->left, low, high);
-
-    // Value is inside the range
-    return 1 +
-        countRange(node->left, low, high) +
-        countRange(node->right, low, high);
+    if (!node) return 0;
+    if (node->data < low) return countRange(node->right, low, high);
+    if (node->data > high) return countRange(node->left, low, high);
+    return 1 + countRange(node->left, low, high) + countRange(node->right, low, high);
 }
 
-// Public range counting function
 int AVLTree::countInRange(int low, int high)
 {
-    if (low > high)
-        return 0;
-
-    return countRange(root, low, high);
+    return low > high ? 0 : countRange(root, low, high);
 }
 
+AVLNode* AVLTree::rotateAt(AVLNode* node, int value, bool leftDirection, bool& rotated)
+{
+    if (!node) return nullptr;
+    if (value < node->data) node->left = rotateAt(node->left, value, leftDirection, rotated);
+    else if (value > node->data) node->right = rotateAt(node->right, value, leftDirection, rotated);
+    else
+    {
+        if (leftDirection && node->right)
+        {
+            node = rotateLeft(node);
+            rotated = true;
+        }
+        else if (!leftDirection && node->left)
+        {
+            node = rotateRight(node);
+            rotated = true;
+        }
+    }
+    updateNode(node);
+    return node;
+}
+
+bool AVLTree::rotateLeftAt(int value)
+{
+    bool rotated = false;
+    root = rotateAt(root, value, true, rotated);
+    if (rotated) lastRotation = "Manual Left Rotation at " + std::to_string(value);
+    return rotated;
+}
+
+bool AVLTree::rotateRightAt(int value)
+{
+    bool rotated = false;
+    root = rotateAt(root, value, false, rotated);
+    if (rotated) lastRotation = "Manual Right Rotation at " + std::to_string(value);
+    return rotated;
+}
+
+bool AVLTree::validateNode(AVLNode* node, int& actualHeight, int& actualSize)
+{
+    if (!node)
+    {
+        actualHeight = 0;
+        actualSize = 0;
+        return true;
+    }
+    int lh = 0, rh = 0, ls = 0, rs = 0;
+    if (!validateNode(node->left, lh, ls) || !validateNode(node->right, rh, rs)) return false;
+    actualHeight = 1 + std::max(lh, rh);
+    actualSize = 1 + ls + rs;
+    int balance = lh - rh;
+    return node->height == actualHeight && node->size == actualSize && balance >= -1 && balance <= 1;
+}
+
+bool AVLTree::isBalanced()
+{
+    int h = 0, s = 0;
+    return validateNode(root, h, s);
+}
+
+AVLNode* AVLTree::getRoot() { return root; }
+std::string AVLTree::getLastRotation() const { return lastRotation; }
+void AVLTree::clearLastRotation() { lastRotation.clear(); }

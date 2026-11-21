@@ -84,6 +84,11 @@ private:
     void performMaximum();
     void performSuccessor();
     void performPredecessor();
+
+    // AVL operations
+    void performAVLInsert();
+    void performAVLDelete();
+
     void clearHighlights(VisualNode* node);
     void highlightNode(VisualNode* node, int value);
 
@@ -109,6 +114,7 @@ private:
     // ACT 1 - Binary Tree
     BinaryTree binaryTree;
     VisualNode* binaryVisualRoot = nullptr;
+    string binaryTraversalResult = "";
 
     // ACT 3 - AVL Tree
     AVLTree avlTree;

@@ -2,9 +2,59 @@
 
 #include <iostream>
 #include <string>
+#include <queue>
+#include <vector>
+#include <functional>
 
 using namespace sf;
 using namespace std;
+
+namespace
+{
+    string getBinaryTraversal(Node* root, int order)
+    {
+        vector<int> values;
+        if (order == 3)
+        {
+            if (root)
+            {
+                queue<Node*> nodes;
+                nodes.push(root);
+                while (!nodes.empty())
+                {
+                    Node* current = nodes.front();
+                    nodes.pop();
+                    values.push_back(current->data);
+                    if (current->left) nodes.push(current->left);
+                    if (current->right) nodes.push(current->right);
+                }
+            }
+        }
+        else
+        {
+            function<void(Node*)> visit = [&](Node* node)
+                {
+                    if (!node) return;
+                    if (order == 0) values.push_back(node->data);
+                    visit(node->left);
+                    if (order == 1) values.push_back(node->data);
+                    visit(node->right);
+                    if (order == 2) values.push_back(node->data);
+                };
+            visit(root);
+        }
+        if (values.empty()) return "Tree is empty.";
+        string result;
+        for (size_t i = 0; i < values.size(); ++i)
+        {
+            if (i) result += " -> ";
+            result += to_string(values[i]);
+        }
+        return result;
+    }
+}
+
+
 
 
 // Constructor
@@ -157,7 +207,10 @@ void Game::processEvents()
                 }
                 else if (key->code == Keyboard::Key::Enter)
                 {
-                    performSearch();
+                    if (selectedAct == 2)
+                    {
+                        performSearch();
+                    }
                 }
             }
 
@@ -354,11 +407,43 @@ void Game::handleMouseClick(Vector2i mousePosition)
             }
             else if (selectedAct == 1)
             {
-                clearHighlights(binaryVisualRoot);
+                int pre[] = { 1, 2, 4, 5, 3 };
+                int in[] = { 4, 2, 5, 1, 3 };
+                binaryTree.buildFromPreorderInorder(pre, in, 5);
+                searchResult = "";
+                searchInput = "";
+                searchInputActive = false;
                 rebuildBinaryVisualTree();
             }
             else if (selectedAct == 3)
             {
+                searchInputActive = false;
+                searchInput = "";
+                searchResult = "";
+                avlTree.reset();
+
+                if (selectedLevel == 2)
+                {
+                    avlTree.insert(30); avlTree.insert(20);
+                    avlTree.insert(40); avlTree.insert(50);
+                }
+                else if (selectedLevel == 3)
+                {
+                    // The double-rotation challenge builds its own LR/RL example on demand.
+                }
+                else if (selectedLevel == 4)
+                {
+                    avlTree.insert(30); avlTree.insert(20);
+                    avlTree.insert(40);
+                }
+                else
+                {
+                    avlTree.insert(50); avlTree.insert(30);
+                    avlTree.insert(70); avlTree.insert(20);
+                    avlTree.insert(40); avlTree.insert(60);
+                    avlTree.insert(80);
+                }
+                avlTree.clearLastRotation();
                 clearHighlights(avlVisualRoot);
                 rebuildAVLVisualTree();
             }
@@ -607,10 +692,227 @@ void Game::handleMouseClick(Vector2i mousePosition)
             }
         }
 
-        else if (selectedAct == 1 || selectedAct == 3)
+        else if (selectedAct == 1)
         {
+            // ACT 1 - FIVE BINARY TREE CHALLENGES
+            if (selectedLevel == 1)
+            {
+                if (isMouseOver(mousePosition, { width - 230.f, 190.f }, { 190.f, 38.f }))
+                    searchResult = "Correct! Preorder: 1 - 2 - 4 - 5 - 3";
+                else if (isMouseOver(mousePosition, { width - 230.f, 240.f }, { 190.f, 38.f }))
+                    searchResult = "Incorrect. Preorder visits Root, Left, Right.";
+                else if (isMouseOver(mousePosition, { width - 230.f, 290.f }, { 190.f, 38.f }))
+                    searchResult = "Incorrect. Try Root-Left-Right.";
+                else if (isMouseOver(mousePosition, { width - 230.f, 340.f }, { 190.f, 38.f }))
+                    searchResult = "Incorrect. Try Root-Left-Right.";
+            }
+            else if (selectedLevel == 2)
+            {
+                if (isMouseOver(mousePosition, { width - 230.f, 190.f }, { 190.f, 38.f }))
+                {
+                    int pre[] = { 1, 2, 4, 5, 3 };
+                    int in[] = { 4, 2, 5, 1, 3 };
+                    binaryTree.buildFromPreorderInorder(pre, in, 5);
+                    rebuildBinaryVisualTree();
+                    searchResult = "Reconstructed from Preorder + Inorder.";
+                }
+                else if (isMouseOver(mousePosition, { width - 230.f, 240.f }, { 190.f, 38.f }))
+                {
+                    int post[] = { 4, 5, 2, 3, 1 };
+                    int in[] = { 4, 2, 5, 1, 3 };
+                    binaryTree.buildFromPostorderInorder(post, in, 5);
+                    rebuildBinaryVisualTree();
+                    searchResult = "Reconstructed from Postorder + Inorder.";
+                }
+            }
+            else if (selectedLevel == 3)
+            {
+                if (isMouseOver(mousePosition, { width - 230.f, 190.f }, { 190.f, 38.f }))
+                    searchResult = "Height = " + to_string(binaryTree.height()) + " levels.";
+                else if (isMouseOver(mousePosition, { width - 230.f, 240.f }, { 190.f, 38.f }))
+                    searchResult = "Diameter = " + to_string(binaryTree.diameter()) + " nodes.";
+            }
+            else if (selectedLevel == 4)
+            {
+                if (isMouseOver(mousePosition, { width - 230.f, 190.f }, { 190.f, 38.f }))
+                    searchResult = "LCA(4, 5) = " + to_string(binaryTree.LCA(4, 5));
+                else if (isMouseOver(mousePosition, { width - 230.f, 240.f }, { 190.f, 38.f }))
+                {
+                    int path[100], length = 0;
+                    if (binaryTree.pathTo(4, path, length))
+                    {
+                        searchResult = "Path to 4: ";
+                        for (int i = 0; i < length; ++i)
+                        {
+                            if (i) searchResult += " -> ";
+                            searchResult += to_string(path[i]);
+                        }
+                    }
+                    else searchResult = "Node not found.";
+                }
+            }
+            else if (selectedLevel == 5)
+            {
+                if (isMouseOver(mousePosition, { width - 230.f, 190.f }, { 190.f, 38.f }))
+                {
+                    binaryTree.mirror();
+                    rebuildBinaryVisualTree();
+                    searchResult = "Tree mirrored successfully.";
+                }
+                else if (isMouseOver(mousePosition, { width - 230.f, 240.f }, { 190.f, 38.f }))
+                    searchResult = string("Symmetric? ") + (binaryTree.isSymmetric() ? "Yes" : "No");
+            }
+
             if (isMouseOver(mousePosition, { 30.f, 620.f }, { 150.f, 50.f }))
             {
+                searchResult = "";
+                currentScreen = LEVEL_INTRO;
+            }
+        }
+
+        else if (selectedAct == 3)
+        {
+            if (isMouseOver(mousePosition, { width - 230.f, 185.f }, { 190.f, 35.f }))
+            {
+                searchInputActive = true;
+            }
+            else if (selectedLevel == 1)
+            {
+                if (isMouseOver(mousePosition, { width - 230.f, 235.f }, { 190.f, 38.f }))
+                {
+                    searchInputActive = false;
+                    if (searchInput.empty()) searchResult = "Enter a node value.";
+                    else
+                    {
+                        int bf = avlTree.balanceFactor(stoi(searchInput));
+                        searchResult = bf == 999 ? "Node not found." : "Balance factor = " + to_string(bf);
+                    }
+                }
+                else if (isMouseOver(mousePosition, { width - 230.f, 280.f }, { 190.f, 38.f }))
+                {
+                    searchInputActive = false;
+                    searchResult = avlTree.isBalanced() ? "All nodes are AVL balanced." : "Tree is NOT AVL balanced.";
+                }
+            }
+            else if (selectedLevel == 2)
+            {
+                if (isMouseOver(mousePosition, { width - 230.f, 235.f }, { 190.f, 38.f }))
+                {
+                    searchInputActive = false;
+                    if (searchInput.empty()) searchResult = "Enter pivot value for LEFT rotation.";
+                    else
+                    {
+                        int pivot = stoi(searchInput);
+                        avlTree.reset();
+                        avlTree.insertDemo(pivot);
+                        avlTree.insertDemo(pivot + 10);
+                        avlTree.insertDemo(pivot + 20);
+                        if (avlTree.rotateLeftAt(pivot))
+                        {
+                            rebuildAVLVisualTree();
+                            searchResult = "RR example repaired by a manual left rotation.";
+                        }
+                        else searchResult = "Cannot rotate left at that pivot.";
+                    }
+                }
+                else if (isMouseOver(mousePosition, { width - 230.f, 280.f }, { 190.f, 38.f }))
+                {
+                    searchInputActive = false;
+                    if (searchInput.empty()) searchResult = "Enter pivot value for RIGHT rotation.";
+                    else
+                    {
+                        int pivot = stoi(searchInput);
+                        avlTree.reset();
+                        avlTree.insertDemo(pivot);
+                        avlTree.insertDemo(pivot - 10);
+                        avlTree.insertDemo(pivot - 20);
+                        if (avlTree.rotateRightAt(pivot))
+                        {
+                            rebuildAVLVisualTree();
+                            searchResult = "LL example repaired by a manual right rotation.";
+                        }
+                        else searchResult = "Cannot rotate right at that pivot.";
+                    }
+                }
+            }
+            else if (selectedLevel == 3)
+            {
+                searchInputActive = false;
+                if (isMouseOver(mousePosition, { width - 230.f, 235.f }, { 190.f, 38.f }))
+                {
+                    avlTree.reset();
+                    avlTree.insertDemo(30); avlTree.insertDemo(10); avlTree.insertDemo(20);
+                    bool first = avlTree.rotateLeftAt(10);
+                    bool second = first && avlTree.rotateRightAt(30);
+                    rebuildAVLVisualTree();
+                    searchResult = second ? "LR double rotation completed: 20 is the new root." : "LR rotation failed.";
+                }
+                else if (isMouseOver(mousePosition, { width - 230.f, 280.f }, { 190.f, 38.f }))
+                {
+                    avlTree.reset();
+                    avlTree.insertDemo(30); avlTree.insertDemo(50); avlTree.insertDemo(40);
+                    bool first = avlTree.rotateRightAt(50);
+                    bool second = first && avlTree.rotateLeftAt(30);
+                    rebuildAVLVisualTree();
+                    searchResult = second ? "RL double rotation completed: 40 is the new root." : "RL rotation failed.";
+                }
+            }
+            else if (selectedLevel == 4)
+            {
+                if (isMouseOver(mousePosition, { width - 230.f, 235.f }, { 190.f, 38.f }))
+                {
+                    searchInputActive = false;
+                    if (searchInput.empty()) searchResult = "Enter a value to insert.";
+                    else
+                    {
+                        avlTree.insert(stoi(searchInput));
+                        rebuildAVLVisualTree();
+                        searchResult = "Inserted. " + avlTree.getLastRotation();
+                        if (avlTree.getLastRotation().empty()) searchResult = "Inserted; no rotation was needed.";
+                    }
+                }
+                else if (isMouseOver(mousePosition, { width - 230.f, 280.f }, { 190.f, 38.f }))
+                {
+                    searchInputActive = false;
+                    if (searchInput.empty()) searchResult = "Enter a value to delete.";
+                    else
+                    {
+                        avlTree.remove(stoi(searchInput));
+                        rebuildAVLVisualTree();
+                        searchResult = "Deleted. " + avlTree.getLastRotation();
+                        if (avlTree.getLastRotation().empty()) searchResult = "Delete completed; no rotation was needed.";
+                    }
+                }
+            }
+            else if (selectedLevel == 5)
+            {
+                if (isMouseOver(mousePosition, { width - 230.f, 235.f }, { 190.f, 38.f }))
+                {
+                    searchInputActive = false;
+                    if (searchInput.empty()) searchResult = "Enter k first.";
+                    else
+                    {
+                        int value = avlTree.kth(stoi(searchInput));
+                        searchResult = value == -1 ? "Invalid k." : "kth smallest = " + to_string(value);
+                    }
+                }
+                else if (isMouseOver(mousePosition, { width - 230.f, 280.f }, { 190.f, 38.f }))
+                {
+                    searchInputActive = false;
+                    if (searchInput.empty()) searchResult = "Enter x first.";
+                    else searchResult = "Rank (values <= x) = " + to_string(avlTree.rank(stoi(searchInput)));
+                }
+                else if (isMouseOver(mousePosition, { width - 230.f, 325.f }, { 190.f, 38.f }))
+                {
+                    searchInputActive = false;
+                    searchResult = "Count in [20, 60] = " + to_string(avlTree.countInRange(20, 60));
+                }
+            }
+
+            if (isMouseOver(mousePosition, { 30.f, 620.f }, { 150.f, 50.f }))
+            {
+                searchInputActive = false;
+                searchResult.clear();
                 currentScreen = LEVEL_INTRO;
             }
         }
@@ -1357,6 +1659,47 @@ void Game::performPredecessor()
     }
 }
 
+// ACT 3 - AVL INSERT
+void Game::performAVLInsert()
+{
+    if (searchInput.empty())
+    {
+        searchResult = "Enter a value first.";
+        return;
+    }
+
+    int value = stoi(searchInput);
+
+    avlTree.insert(value);
+    rebuildAVLVisualTree();
+
+    clearHighlights(avlVisualRoot);
+    highlightNode(avlVisualRoot, value);
+
+    searchResult = "AVL value inserted successfully!";
+    searchInput = "";
+}
+
+// ACT 3 - AVL DELETE
+void Game::performAVLDelete()
+{
+    if (searchInput.empty())
+    {
+        searchResult = "Enter a value first.";
+        return;
+    }
+
+    int value = stoi(searchInput);
+
+    avlTree.remove(value);
+    rebuildAVLVisualTree();
+
+    clearHighlights(avlVisualRoot);
+
+    searchResult = "AVL delete operation completed!";
+    searchInput = "";
+}
+
 VisualNode* Game::convertHeapToVisualTree(int index)
 {
     int value;
@@ -1639,32 +1982,80 @@ void Game::drawHeapEventLog()
 void Game::drawBinaryGameplay()
 {
     float width = static_cast<float>(window.getSize().x);
-
     drawPanel({ 20.f, 15.f }, { width - 40.f, 65.f });
     drawText("LEVEL " + to_string(selectedLevel), { 40.f, 35.f }, 22);
     drawText("ACT 1 - BINARY TREE", { width - 300.f, 35.f }, 22);
 
     drawPanel({ 20.f, 100.f }, { 230.f, 470.f });
     drawText("MISSION", { 40.f, 120.f }, 24);
-
-    drawText("Explore the", { 40.f, 180.f }, 18);
-    drawText("Binary Tree.", { 40.f, 210.f }, 18);
-    drawText("Study its nodes", { 40.f, 270.f }, 16);
-    drawText("and connections.", { 40.f, 295.f }, 16);
+    if (selectedLevel == 1)
+    {
+        drawText("Choose the correct", { 40.f, 180.f }, 16);
+        drawText("PREORDER traversal.", { 40.f, 210.f }, 16);
+        drawText("Root - Left - Right", { 40.f, 260.f }, 15);
+    }
+    else if (selectedLevel == 2)
+    {
+        drawText("Reconstruct the", { 40.f, 180.f }, 17);
+        drawText("tree using traversal", { 40.f, 210.f }, 16);
+        drawText("sequences.", { 40.f, 240.f }, 16);
+    }
+    else if (selectedLevel == 3)
+    {
+        drawText("Explore tree height", { 40.f, 180.f }, 16);
+        drawText("and diameter.", { 40.f, 210.f }, 16);
+    }
+    else if (selectedLevel == 4)
+    {
+        drawText("Find the Lowest", { 40.f, 180.f }, 16);
+        drawText("Common Ancestor", { 40.f, 210.f }, 16);
+        drawText("and a root path.", { 40.f, 240.f }, 16);
+    }
+    else
+    {
+        drawText("Mirror the tree", { 40.f, 180.f }, 17);
+        drawText("and inspect its", { 40.f, 210.f }, 16);
+        drawText("symmetry.", { 40.f, 240.f }, 16);
+    }
 
     drawPanel({ 270.f, 100.f }, { width - 540.f, 470.f });
     drawText("TREE VISUALIZATION", { 290.f, 115.f }, 20);
-
     renderer.drawTree(window, binaryVisualRoot);
 
     drawPanel({ width - 250.f, 100.f }, { 230.f, 470.f });
-    drawText("TREE INFORMATION", { width - 230.f, 120.f }, 20);
-
-    drawText("Binary Tree", { width - 230.f, 190.f }, 18);
-    drawText("Each node has", { width - 230.f, 240.f }, 16);
-    drawText("at most two", { width - 230.f, 265.f }, 16);
-    drawText("children.", { width - 230.f, 290.f }, 16);
-
+    if (selectedLevel == 1)
+    {
+        drawText("SELECT PREORDER", { width - 230.f, 135.f }, 16);
+        drawButton("1 - 2 - 4 - 5 - 3", { width - 230.f, 190.f }, { 190.f, 38.f });
+        drawButton("4 - 2 - 5 - 1 - 3", { width - 230.f, 240.f }, { 190.f, 38.f });
+        drawButton("4 - 5 - 2 - 3 - 1", { width - 230.f, 290.f }, { 190.f, 38.f });
+        drawButton("1 - 2 - 3 - 4 - 5", { width - 230.f, 340.f }, { 190.f, 38.f });
+    }
+    else if (selectedLevel == 2)
+    {
+        drawText("RECONSTRUCTION", { width - 230.f, 135.f }, 17);
+        drawButton("BUILD PRE + IN", { width - 230.f, 190.f }, { 190.f, 38.f });
+        drawButton("BUILD POST + IN", { width - 230.f, 240.f }, { 190.f, 38.f });
+    }
+    else if (selectedLevel == 3)
+    {
+        drawText("TREE MEASUREMENTS", { width - 230.f, 135.f }, 16);
+        drawButton("SHOW HEIGHT", { width - 230.f, 190.f }, { 190.f, 38.f });
+        drawButton("SHOW DIAMETER", { width - 230.f, 240.f }, { 190.f, 38.f });
+    }
+    else if (selectedLevel == 4)
+    {
+        drawText("ANCESTOR & PATH", { width - 230.f, 135.f }, 16);
+        drawButton("LCA OF 4 AND 5", { width - 230.f, 190.f }, { 190.f, 38.f });
+        drawButton("PATH TO NODE 4", { width - 230.f, 240.f }, { 190.f, 38.f });
+    }
+    else
+    {
+        drawText("MIRROR CHALLENGE", { width - 230.f, 135.f }, 16);
+        drawButton("MIRROR TREE", { width - 230.f, 190.f }, { 190.f, 38.f });
+        drawButton("CHECK SYMMETRY", { width - 230.f, 240.f }, { 190.f, 38.f });
+    }
+    drawText(searchResult, { width - 230.f, 330.f }, 13);
     drawButton("BACK", { 30.f, 620.f }, { 150.f, 50.f });
 }
 
@@ -1673,33 +2064,90 @@ void Game::drawBinaryGameplay()
 void Game::drawAVLGameplay()
 {
     float width = static_cast<float>(window.getSize().x);
-
     drawPanel({ 20.f, 15.f }, { width - 40.f, 65.f });
     drawText("LEVEL " + to_string(selectedLevel), { 40.f, 35.f }, 22);
     drawText("ACT 3 - AVL TREE", { width - 250.f, 35.f }, 22);
 
     drawPanel({ 20.f, 100.f }, { 230.f, 470.f });
     drawText("MISSION", { 40.f, 120.f }, 24);
-
-    drawText("Explore the", { 40.f, 180.f }, 18);
-    drawText("AVL Tree.", { 40.f, 210.f }, 18);
-    drawText("Maintain the", { 40.f, 270.f }, 16);
-    drawText("balance of the", { 40.f, 295.f }, 16);
-    drawText("tree using", { 40.f, 320.f }, 16);
-    drawText("rotations.", { 40.f, 345.f }, 16);
+    if (selectedLevel == 1)
+    {
+        drawText("Inspect node balance", { 40.f, 180.f }, 15);
+        drawText("factors and verify", { 40.f, 210.f }, 15);
+        drawText("AVL balance.", { 40.f, 240.f }, 15);
+    }
+    else if (selectedLevel == 2)
+    {
+        drawText("Perform a single", { 40.f, 180.f }, 16);
+        drawText("left or right", { 40.f, 210.f }, 16);
+        drawText("rotation manually.", { 40.f, 240.f }, 16);
+    }
+    else if (selectedLevel == 3)
+    {
+        drawText("Perform LR and RL", { 40.f, 180.f }, 16);
+        drawText("double rotations.", { 40.f, 210.f }, 16);
+        drawText("Reset to retry.", { 40.f, 250.f }, 15);
+    }
+    else if (selectedLevel == 4)
+    {
+        drawText("Insert or delete", { 40.f, 180.f }, 16);
+        drawText("values and observe", { 40.f, 210.f }, 16);
+        drawText("automatic rotations.", { 40.f, 240.f }, 16);
+    }
+    else
+    {
+        drawText("Use subtree sizes", { 40.f, 180.f }, 16);
+        drawText("to find kth, rank", { 40.f, 210.f }, 16);
+        drawText("and range count.", { 40.f, 240.f }, 16);
+    }
 
     drawPanel({ 270.f, 100.f }, { width - 540.f, 470.f });
     drawText("TREE VISUALIZATION", { 290.f, 115.f }, 20);
-
     renderer.drawTree(window, avlVisualRoot);
 
     drawPanel({ width - 250.f, 100.f }, { 230.f, 470.f });
-    drawText("AVL INFORMATION", { width - 230.f, 120.f }, 20);
+    drawText("AVL CHALLENGE", { width - 230.f, 120.f }, 18);
+    drawText("Value / k:", { width - 230.f, 155.f }, 15);
 
-    drawText("Height-balanced", { width - 230.f, 190.f }, 16);
-    drawText("Binary Search Tree", { width - 230.f, 220.f }, 16);
-    drawText("Balance Factor:", { width - 230.f, 280.f }, 16);
-    drawText(" -1, 0, or +1", { width - 230.f, 310.f }, 16);
+    RectangleShape inputBox({ 190.f, 35.f });
+    inputBox.setPosition({ width - 230.f, 175.f });
+    inputBox.setFillColor(Color(18, 22, 35));
+    inputBox.setOutlineColor(searchInputActive ? Color(70, 180, 240) : Color(100, 120, 145));
+    inputBox.setOutlineThickness(2.f);
+    window.draw(inputBox);
+    drawText(searchInput.empty() ? "Enter value..." : searchInput,
+        { width - 220.f, 182.f }, 16);
 
+    if (selectedLevel == 1)
+    {
+        drawButton("CHECK BALANCE FACTOR", { width - 230.f, 235.f }, { 190.f, 38.f });
+        drawButton("VERIFY AVL TREE", { width - 230.f, 280.f }, { 190.f, 38.f });
+    }
+    else if (selectedLevel == 2)
+    {
+        drawButton("ROTATE LEFT AT x", { width - 230.f, 235.f }, { 190.f, 38.f });
+        drawButton("ROTATE RIGHT AT x", { width - 230.f, 280.f }, { 190.f, 38.f });
+    }
+    else if (selectedLevel == 3)
+    {
+        drawButton("LR DOUBLE ROTATION", { width - 230.f, 235.f }, { 190.f, 38.f });
+        drawButton("RL DOUBLE ROTATION", { width - 230.f, 280.f }, { 190.f, 38.f });
+    }
+    else if (selectedLevel == 4)
+    {
+        drawButton("INSERT VALUE", { width - 230.f, 235.f }, { 190.f, 38.f });
+        drawButton("DELETE VALUE", { width - 230.f, 280.f }, { 190.f, 38.f });
+    }
+    else
+    {
+        drawButton("KTH SMALLEST", { width - 230.f, 235.f }, { 190.f, 38.f });
+        drawButton("RANK OF x", { width - 230.f, 280.f }, { 190.f, 38.f });
+        drawButton("COUNT RANGE 20-60", { width - 230.f, 325.f }, { 190.f, 38.f });
+    }
+
+    drawText("Height: " + to_string(avlTree.getHeight()) +
+        (avlTree.isBalanced() ? " | AVL balanced" : " | Not balanced"),
+        { width - 230.f, 390.f }, 12);
+    drawText(searchResult, { width - 230.f, 425.f }, 12);
     drawButton("BACK", { 30.f, 620.f }, { 150.f, 50.f });
 }
