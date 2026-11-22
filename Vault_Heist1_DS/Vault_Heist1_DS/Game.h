@@ -298,4 +298,29 @@ private:
     void handleRangeDecision(int decision);
     void finishRangeRaid();
     void resetRangeRaid();
+
+    // PART D - SCORING, ALARM AND PROGRESSION
+    int alarmSteps = 0;
+    int optimalSteps = 1;
+    int alarmCapacity = 4;
+
+    int penaltyCount = 0;
+    int penaltyPoints = 0;
+    int bonusPoints = 0;
+
+    int starCap = 3;
+    int currentLevelStars = 0;
+    int currentLevelScore = 0;
+
+    int levelStars[4][5] = {};
+    int levelScores[4][5] = {};
+
+    bool levelFailedByAlarm = false;
+    bool finalVaultUnlocked = false;
+
+    void resetLevelScoring();
+    int calculateOptimalSteps();
+    void registerAlarmStep(int amount);
+    void registerPenalty(int additionalAlarm, int pointDeduction);
+    void drawScoringHUD();
 };

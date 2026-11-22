@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include <cmath>
 using namespace sf;
 using namespace std;
 //comment 2.2
@@ -94,6 +95,55 @@ namespace
         appendAVLInorder(node->right, result);
     }
 
+    int countVisualNodes(VisualNode* node)
+    {
+        if (node == nullptr)
+        {
+            return 0;
+        }
+
+        return 1 +
+            countVisualNodes(node->left) +
+            countVisualNodes(node->right);
+    }
+
+
+    int heapSiftDownCount(int values[], int size, int root)
+    {
+        int swaps = 0;
+
+        while (true)
+        {
+            int largest = root;
+            int left = 2 * root + 1;
+            int right = 2 * root + 2;
+
+            if (left < size && values[left] > values[largest])
+            {
+                largest = left;
+            }
+
+            if (right < size && values[right] > values[largest])
+            {
+                largest = right;
+            }
+
+            if (largest == root)
+            {
+                break;
+            }
+
+            int temp = values[root];
+            values[root] = values[largest];
+            values[largest] = temp;
+
+            root = largest;
+            swaps++;
+        }
+
+        return swaps;
+    }
+
 }
 // Constructor
 Game::Game() : sandboxHeap(20), maxHeap(10)
@@ -151,6 +201,219 @@ Game::Game() : sandboxHeap(20), maxHeap(10)
     loadLeaderboard();
     resetSandbox();
 }
+
+
+int Game::calculateOptimalSteps()
+{
+    // ACT 1 - Number of rooms involved in the tree task.
+    if (selectedAct == 1)
+    {
+        return countVisualNodes(binaryVisualRoot);
+    }
+
+    // ACT 2 - Number of rooms in the BST task.
+    else if (selectedAct == 2)
+    {
+        if (selectedLevel == 5)
+        {
+            return 5;
+        }
+
+        return countVisualNodes(visualRoot);
+    }
+
+    // ACT 3 - Number of required operations in each AVL mission.
+    else if (selectedAct == 3)
+    {
+        if (selectedLevel == 1)
+        {
+            return countVisualNodes(avlVisualRoot);
+        }
+        else if (selectedLevel == 2)
+        {
+            return 1;
+        }
+        else if (selectedLevel == 3)
+        {
+            return 2;
+        }
+        else if (selectedLevel == 4)
+        {
+            return 2;
+        }
+        else
+        {
+            return 3;
+        }
+    }
+
+    // ACT 4 - Calculate the optimal heap operations by simulation.
+    else if (selectedAct == 4)
+    {
+        int values[20] = {};
+        int size = maxHeap.getSize();
+
+        if (size > 20)
+        {
+            size = 20;
+        }
+
+        for (int i = 0; i < size; i++)
+        {
+            maxHeap.getValueAt(i, &values[i]);
+        }
+
+        int optimal = 0;
+
+        // Levels 1 and 2: minimum swaps to build a Max Heap.
+        if (selectedLevel == 1 || selectedLevel == 2)
+        {
+            for (int i = size / 2 - 1; i >= 0; i--)
+            {
+                optimal += heapSiftDownCount(values, size, i);
+            }
+
+            return (optimal > 0) ? optimal : 1;
+        }
+
+        // Level 5 also requires building the heap first.
+        if (selectedLevel == 5)
+        {
+            for (int i = size / 2 - 1; i >= 0; i--)
+            {
+                optimal += heapSiftDownCount(values, size, i);
+            }
+        }
+
+        // Levels 3, 4 and 5: extract every maximum.
+        while (size > 1)
+        {
+            int temp = values[0];
+            values[0] = values[size - 1];
+            values[size - 1] = temp;
+
+            optimal++; // Root-last swap
+
+            size--;
+
+            optimal++; // Remove last element
+
+            optimal += heapSiftDownCount(values, size, 0);
+        }
+
+        if (size == 1)
+        {
+            optimal++; // Remove final element
+        }
+
+        return (optimal > 0) ? optimal : 1;
+    }
+
+    return 1;
+}
+
+
+void Game::resetLevelScoring()
+{
+    alarmSteps = 0;
+    penaltyCount = 0;
+    penaltyPoints = 0;
+    bonusPoints = 0;
+
+    starCap = 3;
+    currentLevelStars = 0;
+    currentLevelScore = 0;
+
+    levelFailedByAlarm = false;
+
+    optimalSteps = calculateOptimalSteps();
+
+    if (optimalSteps < 1)
+    {
+        optimalSteps = 1;
+    }
+
+    // Exact formula from the project document.
+    alarmCapacity = static_cast<int>(
+        ceil(1.5 * optimalSteps)) + 2;
+
+    // Keep Act 4's existing alarm checks synchronized.
+    if (selectedAct == 4)
+    {
+        heapAlarmLimit = alarmCapacity;
+    }
+}
+
+
+void Game::registerAlarmStep(int amount)
+{
+    if (levelFailedByAlarm || amount <= 0)
+    {
+        return;
+    }
+
+    alarmSteps += amount;
+
+    if (alarmSteps >= alarmCapacity)
+    {
+        levelFailedByAlarm = true;
+    }
+}
+
+
+void Game::registerPenalty(int additionalAlarm, int pointDeduction)
+{
+    penaltyCount++;
+
+    penaltyPoints += pointDeduction;
+
+    registerAlarmStep(additionalAlarm);
+}
+
+
+void Game::drawScoringHUD()
+{
+    string hud =
+        "STEPS: " + to_string(alarmSteps) +
+        " / " + to_string(alarmCapacity) +
+        "    OPTIMAL: " + to_string(optimalSteps) +
+        "    SCORE: " + to_string(playerScore);
+
+    drawText(hud, { 270.f, 82.f }, 13);
+
+    // Alarm meter background.
+    RectangleShape background({ 200.f, 8.f });
+    background.setPosition({ 760.f, 87.f });
+    background.setFillColor(Color(55, 55, 65));
+    window.draw(background);
+
+    float ratio = static_cast<float>(alarmSteps) /
+        static_cast<float>(alarmCapacity);
+
+    if (ratio > 1.f)
+    {
+        ratio = 1.f;
+    }
+
+    RectangleShape meter({ 200.f * ratio, 8.f });
+    meter.setPosition({ 760.f, 87.f });
+
+    if (ratio < 0.6f)
+    {
+        meter.setFillColor(Color(60, 190, 100));
+    }
+    else if (ratio < 0.85f)
+    {
+        meter.setFillColor(Color(230, 170, 50));
+    }
+    else
+    {
+        meter.setFillColor(Color(220, 65, 65));
+    }
+
+    window.draw(meter);
+}
+
 
 // Main game loop
 void Game::run()
@@ -391,7 +654,6 @@ void Game::processEvents()
     }
 }
 
-
 void Game::update()
 {
     float deltaTime = animationClock.restart().asSeconds();
@@ -407,8 +669,12 @@ void Game::update()
             rebuildHeapVisualTree();
         }
     }
-}
 
+    if (currentScreen == GAMEPLAY && levelFailedByAlarm)
+    {
+        currentScreen = RESULT_SCREEN;
+    }
+}
 
 // Render current screen
 void Game::render()
@@ -449,6 +715,8 @@ void Game::render()
         {
             drawHeapGameplay();
         }
+
+        drawScoringHUD();
     }
     else if (currentScreen == RESULT_SCREEN)
     {
@@ -473,6 +741,20 @@ void Game::handleMouseClick(Vector2i mousePosition)
 {
     float width = static_cast<float>(window.getSize().x);
     float centerX = width / 2.f;
+
+    // Count gameplay clicks as steps for Acts 1-3.
+// Act 4 records its model operations in addHeapEvent().
+    if (currentScreen == GAMEPLAY && selectedAct != 4)
+    {
+        bool navigationClick =
+            isMouseOver(mousePosition, { 30.f, 620.f }, { 150.f, 50.f }) ||
+            isMouseOver(mousePosition, { 800.f, 620.f }, { 170.f, 50.f });
+
+        if (!navigationClick)
+        {
+            registerAlarmStep(1);
+        }
+    }
 
     if (currentScreen == MAIN_MENU)
     {
@@ -704,6 +986,14 @@ void Game::handleMouseClick(Vector2i mousePosition)
                 avlTree.clearLastRotation();
                 clearHighlights(avlVisualRoot);
                 rebuildAVLVisualTree();
+            }
+
+            // Start fresh scoring for this level.
+            resetLevelScoring();
+
+            if (selectedAct == 4)
+            {
+                heapAlarmLimit = alarmCapacity;
             }
         }
 
@@ -953,6 +1243,7 @@ void Game::handleMouseClick(Vector2i mousePosition)
 
                 if (first == second)
                 {
+                    registerPenalty(1, 0);
                     heapResult = "Choose two different positions.";
                     return;
                 }
@@ -1008,6 +1299,7 @@ void Game::handleMouseClick(Vector2i mousePosition)
                     if (child != 2 * parent + 1 &&
                         child != 2 * parent + 2)
                     {
+                        registerPenalty(1, 0);
                         heapResult = "Select a parent and its child.";
                         return;
                     }
@@ -1020,6 +1312,7 @@ void Game::handleMouseClick(Vector2i mousePosition)
 
                     if (childValue <= parentValue)
                     {
+                        registerPenalty(1, 0);
                         heapResult = "The child must be larger than its parent.";
                         return;
                     }
@@ -1034,6 +1327,7 @@ void Game::handleMouseClick(Vector2i mousePosition)
 
                         if (siblingValue > childValue)
                         {
+                            registerPenalty(1, 0);
                             heapResult = "Choose the larger child.";
                             return;
                         }
@@ -1081,6 +1375,7 @@ void Game::handleMouseClick(Vector2i mousePosition)
                     if (!((first == 0 && second == last) ||
                         (first == last && second == 0)))
                     {
+                        registerPenalty(1, 0);
                         heapResult = "Select the ROOT and LAST position.";
                         return;
                     }
@@ -1250,7 +1545,9 @@ void Game::handleMouseClick(Vector2i mousePosition)
                     isMouseOver(mousePosition, { width - 230.f, 290.f }, { 190.f, 38.f }) ||
                     isMouseOver(mousePosition, { width - 230.f, 340.f }, { 190.f, 38.f }))
                 {
-                    binaryLevelSuccess = false; searchResult = "Incorrect. Preorder is Root, Left, Right.";
+                    binaryLevelSuccess = false; 
+                    registerPenalty(0, 0);
+                    searchResult = "Incorrect. Preorder is Root, Left, Right.";
                 }
             }
             else if (selectedLevel == 2)
@@ -1409,7 +1706,10 @@ void Game::handleMouseClick(Vector2i mousePosition)
                 {
                     searchInputActive = false;
                     if (searchInput.empty()) searchResult = "Enter pivot value 30 first.";
-                    else if (stoi(searchInput) != 30) searchResult = "Incorrect pivot. The unbalanced root is 30.";
+                    else if (stoi(searchInput) != 30) {
+                        searchResult = "Incorrect pivot. The unbalanced root is 30.";
+                        registerPenalty(1, 50);
+                    }
                     else
                     {
                         avlTree.reset();
@@ -1427,6 +1727,7 @@ void Game::handleMouseClick(Vector2i mousePosition)
                 {
                     searchInputActive = false;
                     searchResult = "That direction is not correct for this RR imbalance. Use a left rotation.";
+                    registerPenalty(1, 50);
                 }
                 avlLevelSuccess = avlSingleRotationDone;
             }
@@ -1553,27 +1854,91 @@ void Game::completeCurrentLevel()
     int actIndex = selectedAct - 1;
     int levelIndex = selectedLevel - 1;
 
-    // Award points only the first time this level is completed.
-    if (!levelCompleted[actIndex][levelIndex])
-        playerScore += 100;
+    // Calculate stars according to the project rubric.
+    if (alarmSteps <= optimalSteps && penaltyCount == 0)
+    {
+        currentLevelStars = 3;
+    }
+    else if (alarmSteps <= 1.25 * optimalSteps &&
+        penaltyCount <= 1)
+    {
+        currentLevelStars = 2;
+    }
+    else if (alarmSteps < alarmCapacity)
+    {
+        currentLevelStars = 1;
+    }
+    else
+    {
+        currentLevelStars = 0;
+    }
 
-    // Mark current level as completed
+    // A hint can reduce the maximum possible stars.
+    if (currentLevelStars > starCap)
+    {
+        currentLevelStars = starCap;
+    }
+
+    // Project scoring formula.
+    currentLevelScore =
+        1000 -
+        (10 * alarmSteps) -
+        penaltyPoints +
+        bonusPoints;
+
+    if (currentLevelScore < 0)
+    {
+        currentLevelScore = 0;
+    }
+
+    // Store the best star result for this level.
+    if (currentLevelStars > levelStars[actIndex][levelIndex])
+    {
+        levelStars[actIndex][levelIndex] = currentLevelStars;
+    }
+
+    // Store the best score for this level.
+    if (currentLevelScore > levelScores[actIndex][levelIndex])
+    {
+        levelScores[actIndex][levelIndex] = currentLevelScore;
+    }
+
+    // Award campaign points only on first completion.
+    if (!levelCompleted[actIndex][levelIndex])
+    {
+        playerScore += currentLevelScore;
+    }
+
     levelCompleted[actIndex][levelIndex] = true;
 
-    // Unlock the next level
+    // Unlock next level.
     if (selectedLevel < 5)
     {
         levelUnlocked[actIndex][levelIndex + 1] = true;
     }
-    // Unlock the next act after completing Level 5
     else if (selectedAct < 4)
     {
         actUnlocked[actIndex + 1] = true;
         levelUnlocked[actIndex + 1][0] = true;
     }
 
+    // Check all 20 campaign levels.
+    finalVaultUnlocked = true;
+
+    for (int act = 0; act < 4; act++)
+    {
+        for (int level = 0; level < 5; level++)
+        {
+            if (!levelCompleted[act][level])
+            {
+                finalVaultUnlocked = false;
+            }
+        }
+    }
+
     currentScreen = RESULT_SCREEN;
 }
+
 
 // Check whether mouse is inside a button
 bool Game::isMouseOver(Vector2i mousePosition, Vector2f position, Vector2f size)
@@ -3401,6 +3766,11 @@ void Game::replayHeapLevel()
 
 void Game::addHeapEvent(string event)
 {
+    if (event != "UNDO" && event != "REPLAY")
+    {
+        registerAlarmStep(1);
+    }
+
     if (heapEventCount >= MAX_HEAP_ANIMATION_STEPS)
     {
         return;
@@ -3645,48 +4015,109 @@ void Game::drawAVLGameplay()
     drawButton("COMPLETE LEVEL", { 800.f, 620.f }, { 170.f, 50.f }, avlLevelSuccess);
 }
 
+
 void Game::drawResultScreen()
 {
     float centerX = static_cast<float>(window.getSize().x) / 2.f;
 
-    if (selectedAct == 4 && selectedLevel == 5)
+    // Display the appropriate result heading
+    if (levelFailedByAlarm)
     {
-        drawCenteredText("CAMPAIGN COMPLETED!", 100.f, 42);
-        drawCenteredText("You have completed all four Acts!", 180.f, 24);
+        drawCenteredText("ALARM TRIGGERED!", 65.f, 38);
+        drawCenteredText("The vault security system caught you.", 115.f, 20);
+        drawCenteredText("You earned 0 stars. Retry the level.", 150.f, 18);
+    }
+    else if (finalVaultUnlocked)
+    {
+        drawCenteredText("FINAL VAULT UNLOCKED!", 65.f, 38);
+        drawCenteredText("You completed all 20 campaign levels!", 115.f, 22);
+        drawCenteredText("THE LIVING VAULT HAS BEEN CONQUERED!", 150.f, 18);
     }
     else
     {
-        drawCenteredText("LEVEL COMPLETED!", 100.f, 42);
-        drawCenteredText("Well done! You completed the level.", 180.f, 24);
-    }
+        drawCenteredText("LEVEL COMPLETED!", 65.f, 38);
 
-    drawCenteredText(
-        "ACT " + to_string(selectedAct) +
-        " - LEVEL " + to_string(selectedLevel),
-        250.f, 25
-    );
-
-    drawButton(
-        "RETRY LEVEL",
-        { centerX - 150.f, 350.f },
-        { 300.f, 50.f }
-    );
-
-    if (selectedLevel < 5 || selectedAct < 4)
-    {
-        drawButton(
-            "NEXT LEVEL",
-            { centerX - 150.f, 420.f },
-            { 300.f, 50.f }
+        drawCenteredText(
+            "ACT " + to_string(selectedAct) +
+            " - LEVEL " + to_string(selectedLevel),
+            120.f, 22
         );
     }
 
+    // Display earned stars
+    string starsText = "STARS: ";
+
+    for (int i = 0; i < currentLevelStars; i++)
+    {
+        starsText += "* ";
+    }
+
+    if (currentLevelStars == 0)
+    {
+        starsText += "NONE";
+    }
+
+    drawCenteredText(starsText, 205.f, 28);
+
+    // Display steps and optimal steps
+    drawCenteredText(
+        "STEPS: " + to_string(alarmSteps) +
+        " | OPTIMAL: " + to_string(optimalSteps),
+        260.f, 20
+    );
+
+    // Display alarm information
+    drawCenteredText(
+        "ALARM: " + to_string(alarmSteps) +
+        " / " + to_string(alarmCapacity),
+        295.f, 18
+    );
+
+    // Display penalties and deductions
+    drawCenteredText(
+        "PENALTIES: " + to_string(penaltyCount) +
+        " | POINT DEDUCTIONS: " + to_string(penaltyPoints),
+        330.f, 18
+    );
+
+    // Display level score
+    drawCenteredText(
+        "LEVEL SCORE: " + to_string(currentLevelScore),
+        365.f, 21
+    );
+
+    // Display total campaign score
+    drawCenteredText(
+        "TOTAL CAMPAIGN SCORE: " + to_string(playerScore),
+        400.f, 20
+    );
+
+    // Retry button
+    drawButton(
+        "RETRY LEVEL",
+        { centerX - 150.f, 450.f },
+        { 300.f, 45.f }
+    );
+
+    // Next level button (only if the level was not failed)
+    if ((selectedLevel < 5 || selectedAct < 4) && !levelFailedByAlarm)
+    {
+        drawButton(
+            "NEXT LEVEL",
+            { centerX - 150.f, 505.f },
+            { 300.f, 45.f }
+        );
+    }
+
+    // Campaign map button
     drawButton(
         "CAMPAIGN MAP",
-        { centerX - 150.f, 490.f },
-        { 300.f, 50.f }
+        { centerX - 150.f, 560.f },
+        { 300.f, 45.f }
     );
 }
+
+
 
 void Game::handleResultClick(Vector2i mousePosition)
 {
@@ -3694,14 +4125,16 @@ void Game::handleResultClick(Vector2i mousePosition)
 
     // Retry current level
     if (isMouseOver(mousePosition,
-        { centerX - 150.f, 350.f }, { 300.f, 50.f }))
+        { centerX - 150.f, 450.f }, { 300.f, 45.f }))
     {
         currentScreen = LEVEL_INTRO;
     }
 
     // Move to the next level
     else if (isMouseOver(mousePosition,
-        { centerX - 150.f, 420.f }, { 300.f, 50.f }))
+        { centerX - 150.f, 505.f }, { 300.f, 45.f }) &&
+        (selectedLevel < 5 || selectedAct < 4) &&
+        !levelFailedByAlarm)
     {
         if (selectedLevel < 5)
         {
@@ -3718,7 +4151,7 @@ void Game::handleResultClick(Vector2i mousePosition)
 
     // Return to campaign map
     else if (isMouseOver(mousePosition,
-        { centerX - 150.f, 490.f }, { 300.f, 50.f }))
+        { centerX - 150.f, 560.f }, { 300.f, 45.f }))
     {
         currentScreen = CAMPAIGN_MAP;
     }
