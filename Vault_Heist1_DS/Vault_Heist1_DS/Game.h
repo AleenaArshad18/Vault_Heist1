@@ -73,6 +73,8 @@ private:
     int bstDeleteSuccessor = -1;
     int bstLevel5NextValue = 0;
     int bstLevel5Values[5] = { 10, 20, 30, 40, 50 };
+    bool bstLevel5BuildComplete = false;
+    bool bstLevel5SearchComplete = false;
     string rangeLowInput = "";
     string rangeHighInput = "";
     bool rangeLowInputActive = false;
@@ -101,6 +103,7 @@ private:
     bool bstInsertStarted = false;
     bool bstInsertReadyToInsert = false;
     bool bstInsertLeft = false;
+
     void startBSTInsertion();
     void moveBSTInsertLeft();
     void moveBSTInsertRight();
@@ -188,6 +191,19 @@ private:
     MaxHeap maxHeap;
     VisualNode* heapVisualRoot = nullptr;
     int selectedHeapIndex = -1;
+    // ACT 4 - HEAP LEVEL PROGRESS
+    bool heapLevelSuccess = false;
+
+    int heapExtractedValues[20] = {};
+    int heapExtractedCount = 0;
+
+    int heapSteps = 0;
+    int heapAlarmLimit = 8;
+
+    int previousHeapExtractedCount = 0;
+    int previousHeapSteps = 0;
+    bool previousHeapLevelSuccess = false;
+
     void highlightHeapNode(VisualNode* node, int targetIndex, int currentIndex = 0);
     void loadHeapLevel();
     string heapInput = "";
