@@ -339,15 +339,24 @@ void Game::processEvents()
         {
             if (const auto* key = event->getIf<Event::KeyPressed>())
             {
+
                 if (selectedAct == 4)
                 {
                     if (key->code == Keyboard::Key::Space)
                     {
+                        heapPlaybackMode = true;
+
                         animationController.togglePlayPause();
+
+                        rebuildHeapVisualTree();
                     }
                     else if (key->code == Keyboard::Key::Right)
                     {
+                        heapPlaybackMode = true;
+
                         animationController.stepForward();
+
+                        rebuildHeapVisualTree();
                     }
                     else if (key->code == Keyboard::Key::Equal)
                     {
@@ -359,7 +368,12 @@ void Game::processEvents()
                         animationController.setSpeed(
                             animationController.getSpeed() - 0.25f);
                     }
+                    else if (key->code == Keyboard::Key::R)
+                    {
+                        replayHeapLevel();
+                    }
                 }
+
 
                 // Existing BST search control
                 if (key->code == Keyboard::Key::Enter)
@@ -377,6 +391,7 @@ void Game::processEvents()
     }
 }
 
+
 void Game::update()
 {
     float deltaTime = animationClock.restart().asSeconds();
@@ -384,6 +399,13 @@ void Game::update()
     if (currentScreen == GAMEPLAY && selectedAct == 4)
     {
         animationController.update(deltaTime);
+
+        if (heapPlaybackMode &&
+            heapDisplayedAnimationIndex !=
+            animationController.getCurrentIndex())
+        {
+            rebuildHeapVisualTree();
+        }
     }
 }
 
@@ -801,6 +823,12 @@ void Game::handleMouseClick(Vector2i mousePosition)
             {
                 loadHeapLevel();
             }
+
+            // Do not allow heap selections while viewing recorded playback.
+            else if (heapPlaybackMode)
+            {
+                return;
+                }
 
             // ARRAY SELECTION AND MANUAL SWAPPING
             else
@@ -2865,18 +2893,95 @@ VisualNode* Game::convertHeapToVisualTree(int index)
     return node;
 }
 
+
+void Game::captureHeapAnimationSnapshot(int index)
+{
+    if (index < 0 || index > MAX_HEAP_ANIMATION_STEPS)
+    {
+        return;
+    }
+
+    int totalElements = maxHeap.getSize();
+
+    if (totalElements > MAX_HEAP_ELEMENTS)
+    {
+        totalElements = MAX_HEAP_ELEMENTS;
+    }
+
+    heapAnimationSizes[index] = totalElements;
+
+    for (int i = 0; i < totalElements; i++)
+    {
+        maxHeap.getValueAt(i, &heapAnimationStates[index][i]);
+    }
+
+    heapAnimationExtractedCounts[index] = heapExtractedCount;
+
+    for (int i = 0; i < heapExtractedCount &&
+        i < MAX_HEAP_ELEMENTS; i++)
+    {
+        heapAnimationExtracted[index][i] = heapExtractedValues[i];
+    }
+
+    heapAnimationStateCount = index + 1;
+}
+
+
+VisualNode* Game::convertHeapSnapshotToVisualTree(
+    int values[], int count, int index)
+{
+    if (index < 0 || index >= count)
+    {
+        return nullptr;
+    }
+
+    VisualNode* node = new VisualNode;
+
+    node->value = values[index];
+
+    node->left = convertHeapSnapshotToVisualTree(
+        values, count, 2 * index + 1);
+
+    node->right = convertHeapSnapshotToVisualTree(
+        values, count, 2 * index + 2);
+
+    return node;
+}
+
+
 void Game::rebuildHeapVisualTree()
 {
     deleteHeapVisualTree(heapVisualRoot);
 
-    heapVisualRoot = convertHeapToVisualTree(0);
+    // Playback mode displays a saved snapshot.
+    if (heapPlaybackMode &&
+        animationController.getCurrentIndex() < heapAnimationStateCount)
+    {
+        int index = animationController.getCurrentIndex();
+
+        heapVisualRoot = convertHeapSnapshotToVisualTree(
+            heapAnimationStates[index],
+            heapAnimationSizes[index],
+            0);
+
+        heapDisplayedAnimationIndex = index;
+    }
+    else
+    {
+        // Normal gameplay displays the actual heap.
+        heapVisualRoot = convertHeapToVisualTree(0);
+
+        heapDisplayedAnimationIndex = -1;
+    }
 
     float width = static_cast<float>(window.getSize().x);
 
-    layoutEngine.calculatePositions(heapVisualRoot, width * 0.5f, 200.f, 90.f);
+    layoutEngine.calculatePositions(
+        heapVisualRoot, width * 0.5f, 200.f, 90.f);
 
     shiftTree(heapVisualRoot, width * 0.25f);
 }
+
 
 void Game::deleteHeapVisualTree(VisualNode* node)
 {
@@ -2891,11 +2996,21 @@ void Game::deleteHeapVisualTree(VisualNode* node)
     delete node;
 }
 
+
 void Game::drawHeapArray()
 {
     drawText("Heap Array", Vector2f(420.f, 465.f), 24);
 
     int totalElements = maxHeap.getSize();
+
+    int playbackIndex = animationController.getCurrentIndex();
+
+    if (heapPlaybackMode &&
+        playbackIndex >= 0 &&
+        playbackIndex < heapAnimationStateCount)
+    {
+        totalElements = heapAnimationSizes[playbackIndex];
+    }
 
     float cellWidth = 70.f;
     float cellHeight = 55.f;
@@ -2908,34 +3023,43 @@ void Game::drawHeapArray()
 
     for (int i = 0; i < totalElements; i++)
     {
-        int value;
+        int value = 0;
 
-        if (maxHeap.getValueAt(i, &value))
+        if (heapPlaybackMode)
         {
-            float x = startX + i * (cellWidth + gap);
-
-            RectangleShape cell(Vector2f(cellWidth, cellHeight));
-
-            cell.setPosition(Vector2f(x, 505.f));
-            if (selectedHeapIndex == i)
-            {
-                cell.setFillColor(Color(180, 120, 40));
-            }
-            else
-            {
-                cell.setFillColor(Color(45, 55, 75));
-            }
-            cell.setOutlineColor(Color::White);
-            cell.setOutlineThickness(2.f);
-
-            window.draw(cell);
-
-            drawText(to_string(value), Vector2f(x + 20.f, 515.f), 22);
-
-            drawText(to_string(i), Vector2f(x + 28.f, 565.f), 16);
+            value = heapAnimationStates[playbackIndex][i];
         }
+        else
+        {
+            maxHeap.getValueAt(i, &value);
+        }
+
+        float x = startX + i * (cellWidth + gap);
+
+        RectangleShape cell(Vector2f(cellWidth, cellHeight));
+
+        cell.setPosition(Vector2f(x, 505.f));
+
+        if (!heapPlaybackMode && selectedHeapIndex == i)
+        {
+            cell.setFillColor(Color(180, 120, 40));
+        }
+        else
+        {
+            cell.setFillColor(Color(45, 55, 75));
+        }
+
+        cell.setOutlineColor(Color::White);
+        cell.setOutlineThickness(2.f);
+
+        window.draw(cell);
+
+        drawText(to_string(value), Vector2f(x + 20.f, 515.f), 22);
+
+        drawText(to_string(i), Vector2f(x + 28.f, 565.f), 16);
     }
 }
+
 
 void Game::drawHeapGameplay()
 {
@@ -2987,14 +3111,29 @@ void Game::drawHeapGameplay()
     // Active heap array
     drawHeapArray();
 
+
     // Extracted values / sorted values
+    int displayedExtractedCount = heapExtractedCount;
+
+    if (heapPlaybackMode)
+    {
+        displayedExtractedCount =
+            heapAnimationExtractedCounts[
+                animationController.getCurrentIndex()];
+    }
+
     if (selectedLevel == 3 || selectedLevel == 4)
     {
         string extractedText = "EXTRACTED MAXIMA: ";
 
-        for (int i = 0; i < heapExtractedCount; i++)
+        for (int i = 0; i < displayedExtractedCount; i++)
         {
-            extractedText += to_string(heapExtractedValues[i]) + " ";
+            int value = heapPlaybackMode
+                ? heapAnimationExtracted[
+                    animationController.getCurrentIndex()][i]
+                        : heapExtractedValues[i];
+
+                    extractedText += to_string(value) + " ";
         }
 
         drawText(extractedText, { 250.f, 575.f }, 16);
@@ -3003,13 +3142,19 @@ void Game::drawHeapGameplay()
     {
         string sortedText = "SORTED: ";
 
-        for (int i = heapExtractedCount - 1; i >= 0; i--)
+        for (int i = displayedExtractedCount - 1; i >= 0; i--)
         {
-            sortedText += to_string(heapExtractedValues[i]) + " ";
+            int value = heapPlaybackMode
+                ? heapAnimationExtracted[
+                    animationController.getCurrentIndex()][i]
+                        : heapExtractedValues[i];
+
+                    sortedText += to_string(value) + " ";
         }
 
         drawText(sortedText, { 250.f, 575.f }, 16);
     }
+
 
     drawHeapOperations();
     drawHeapEventLog();
@@ -3106,6 +3251,13 @@ void Game::drawHeapOperations()
 void Game::loadHeapLevel()
 {
     heapLevelSuccess = false;
+    heapPlaybackMode = false;
+    heapDisplayedAnimationIndex = -1;
+    heapAnimationStateCount = 0;
+    heapEventCount = 0;
+
+    animationController.setEvents(heapEvents, 0);
+
     heapLevelFailed = false;
     heapExtractedCount = 0;
     heapSteps = 0;
@@ -3156,13 +3308,20 @@ void Game::loadHeapLevel()
         heapAlarmLimit = 8;
     }
 
-    rebuildHeapVisualTree();
-
     heapInput = "";
     heapResult = "";
     heapInputActive = false;
 
     heapEventCount = 0;
+    heapAnimationStateCount = 0;
+
+    animationController.setEvents(heapEvents, 0);
+
+    // Save the initial heap as snapshot 0.
+    captureHeapAnimationSnapshot(0);
+
+    rebuildHeapVisualTree();
+
     canUndo = false;
 }
 
@@ -3221,81 +3380,96 @@ void Game::undoHeapOperation()
     canUndo = false;
 }
 
+
 void Game::replayHeapLevel()
 {
-    loadHeapLevel();
+    if (heapEventCount == 0)
+    {
+        heapResult = "No operations recorded yet!";
+        return;
+    }
 
-    selectedHeapIndex = -1;
+    heapPlaybackMode = true;
 
-    heapInput = "";
-    heapResult = "";
-    heapInputActive = false;
+    animationController.reset();
 
-    heapEventCount = 0;
-    canUndo = false;
+    rebuildHeapVisualTree();
+
+    heapResult = "Playback restarted from the beginning.";
 }
+
 
 void Game::addHeapEvent(string event)
 {
-    if (heapEventCount < 6)
+    if (heapEventCount >= MAX_HEAP_ANIMATION_STEPS)
     {
-        heapEvents[heapEventCount] = event;
-        heapEventCount++;
-    }
-    else
-    {
-        for (int i = 0; i < 5; i++)
-        {
-            heapEvents[i] = heapEvents[i + 1];
-        }
-
-        heapEvents[5] = event;
+        return;
     }
 
+    heapEvents[heapEventCount] = event;
+
+    heapEventCount++;
+
+    // Save the heap AFTER this operation.
+    captureHeapAnimationSnapshot(heapEventCount);
+
+    // Update the controller with the recorded operations.
     animationController.setEvents(heapEvents, heapEventCount);
+
+    // Return the display to the actual current gameplay state.
+    heapPlaybackMode = false;
+    heapDisplayedAnimationIndex = -1;
 }
+ 
 
 void Game::drawHeapEventLog()
 {
-    drawPanel({ 250.f, 615.f }, { 500.f, 65.f });
+    drawPanel({ 190.f, 610.f }, { 570.f, 75.f });
 
-    drawText("EVENT LOG", { 265.f, 620.f }, 15);
-
-    for (int i = 0; i < heapEventCount; i++)
-    {
-        drawText(heapEvents[i],
-            { 265.f + i * 78.f, 648.f }, 11);
-    }
-
-    string playbackStatus = "PAUSED";
+    string status = "PAUSED";
 
     if (animationController.isPlaying())
     {
-        playbackStatus = "PLAYING";
+        status = "PLAYING";
     }
     else if (animationController.isFinished())
     {
-        playbackStatus = "FINISHED";
+        status = "FINISHED";
     }
 
     drawText(
-        playbackStatus +
+        "EVENT LOG | " + status +
         " | SPEED: " +
-        to_string(animationController.getSpeed()) +
-        "x",
-        { 760.f, 615.f },
-        13);
+        to_string(animationController.getSpeed()) + "x",
+        { 205.f, 615.f },
+        14);
 
-    drawText(
-        "SPACE: PLAY/PAUSE | RIGHT: STEP | +/-: SPEED",
-        { 760.f, 640.f },
-        10);
+    int startIndex = heapEventCount - 5;
+
+    if (startIndex < 0)
+    {
+        startIndex = 0;
+    }
+
+    float x = 205.f;
+
+    for (int i = startIndex; i < heapEventCount; i++)
+    {
+        drawText(heapEvents[i], { x, 640.f }, 11);
+        x += 105.f;
+    }
 
     drawText(
         "CURRENT: " + animationController.getCurrentEvent(),
-        { 760.f, 660.f },
+        { 205.f, 660.f },
+        11);
+
+    drawText(
+        "SPACE: PLAY/PAUSE | RIGHT: STEP | +/-: SPEED | R: REPLAY",
+        { 450.f, 660.f },
         10);
 }
+
 
 // ACT 1 - BINARY TREE GAMEPLAY
 void Game::drawBinaryGameplay()

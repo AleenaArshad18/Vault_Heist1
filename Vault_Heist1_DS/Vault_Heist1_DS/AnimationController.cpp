@@ -133,7 +133,7 @@ bool AnimationController::isPlaying() const
 
 bool AnimationController::isFinished() const
 {
-    return currentIndex >= eventCount;
+    return eventCount > 0 && currentIndex >= eventCount;
 }
 
 int AnimationController::getCurrentIndex() const
@@ -153,9 +153,14 @@ float AnimationController::getSpeed() const
 
 string AnimationController::getCurrentEvent() const
 {
-    if (currentIndex >= 0 && currentIndex < eventCount)
+    if (currentIndex == 0)
     {
-        return events[currentIndex];
+        return "INITIAL STATE";
+    }
+
+    if (currentIndex > 0 && currentIndex <= eventCount)
+    {
+        return events[currentIndex - 1];
     }
 
     return "";

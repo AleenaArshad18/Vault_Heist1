@@ -257,10 +257,33 @@ private:
     void saveHeapState();
     void undoHeapOperation();
     void replayHeapLevel();
-    string heapEvents[6];
+
+    static const int MAX_HEAP_ANIMATION_STEPS = 100;
+    static const int MAX_HEAP_ELEMENTS = 20;
+
+    string heapEvents[MAX_HEAP_ANIMATION_STEPS];
     int heapEventCount = 0;
+
+    // Saved heap arrays for playback.
+    // Snapshot 0 is the initial state.
+    // Snapshot 1 is the state after the first event.
+    int heapAnimationStates[MAX_HEAP_ANIMATION_STEPS + 1][MAX_HEAP_ELEMENTS] = {};
+    int heapAnimationSizes[MAX_HEAP_ANIMATION_STEPS + 1] = {};
+
+    int heapAnimationExtracted[MAX_HEAP_ANIMATION_STEPS + 1][MAX_HEAP_ELEMENTS] = {};
+    int heapAnimationExtractedCounts[MAX_HEAP_ANIMATION_STEPS + 1] = {};
+
+    int heapAnimationStateCount = 0;
+
+    bool heapPlaybackMode = false;
+    int heapDisplayedAnimationIndex = -1;
+
+    void captureHeapAnimationSnapshot(int index);
+    VisualNode* convertHeapSnapshotToVisualTree(int values[], int count, int index);
+
     void addHeapEvent(string event);
     void drawHeapEventLog();
+
     bool actUnlocked[4] = { true, false, false, false };
     bool levelUnlocked[4][5] =
     {

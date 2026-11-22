@@ -11,6 +11,9 @@ private:
 
     string events[MAX_EVENTS];
     int eventCount = 0;
+
+    // 0 means the initial state.
+    // 1 means the state after event 1, and so on.
     int currentIndex = 0;
 
     bool playing = false;
