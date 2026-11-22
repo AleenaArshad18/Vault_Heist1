@@ -25,4 +25,8 @@ public:
 	bool findSuccessor(int value, int* successorValue);
 	bool findPredecessor(int value, int* predecessorValue);
 	Node* getRoot();
+
+	void rangeQuery(Node* node, int low, int high, int output[], int& count);
+	void rangeQuery(int low, int high, int output[], int& count);
+	void clear();
 };

@@ -298,3 +298,52 @@ bool BST::findPredecessor(int value, int* predecessorValue)
     return true;
 }
 
+void BST::rangeQuery(Node* node, int low, int high, int output[], int& count)
+{
+    if (node == nullptr)
+        return;
+
+    if (node->data > low)
+        rangeQuery(node->left, low, high, output, count);
+
+    if (node->data >= low && node->data <= high)
+        output[count++] = node->data;
+
+    if (node->data < high)
+        rangeQuery(node->right, low, high, output, count);
+}
+
+void BST::rangeQuery(int low, int high, int output[], int& count)
+{
+    count = 0;
+
+    if (low > high)
+        return;
+
+    rangeQuery(root, low, high, output, count);
+}
+
+void BST::clear()
+{
+    // Delete all nodes in the current tree
+    Node* nodes[1000];
+    int count = 0;
+
+    if (root != nullptr)
+        nodes[count++] = root;
+
+    while (count > 0)
+    {
+        Node* current = nodes[--count];
+
+        if (current->left != nullptr)
+            nodes[count++] = current->left;
+
+        if (current->right != nullptr)
+            nodes[count++] = current->right;
+
+        delete current;
+    }
+
+    root = nullptr;
+}

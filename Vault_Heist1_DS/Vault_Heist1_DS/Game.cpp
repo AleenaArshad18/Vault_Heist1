@@ -135,88 +135,68 @@ Game::~Game()
     deleteVisualTree(avlVisualRoot);
 }
 
+
 // Process window events
 void Game::processEvents()
 {
     while (auto event = window.pollEvent())
     {
+        // Close window
         if (event->is<Event::Closed>())
         {
             window.close();
         }
 
-        if (event->is<sf::Event::TextEntered>())
+        // ---------------------------------
+        // TEXT INPUT
+        // ---------------------------------
+        if (const auto* text = event->getIf<Event::TextEntered>())
         {
-            if (heapInputActive)
+            // MAX HEAP INPUT - ACT 4
+            if (currentScreen == GAMEPLAY &&
+                selectedAct == 4 && heapInputActive)
             {
-                auto textEvent = event->getIf<sf::Event::TextEntered>();
-
-                if (textEvent->unicode >= '0' && textEvent->unicode <= '9')
+                if (text->unicode >= '0' && text->unicode <= '9')
                 {
-                    heapInput += static_cast<char>(textEvent->unicode);
+                    heapInput += static_cast<char>(text->unicode);
                 }
-                else if (textEvent->unicode == 8 && !heapInput.empty())
+                else if (text->unicode == 8 && !heapInput.empty())
                 {
                     heapInput.pop_back();
                 }
             }
-        }
 
-        if (const auto* resized = event->getIf<Event::Resized>())
-        {
-            float width = static_cast<float>(resized->size.x);
-            float height = static_cast<float>(resized->size.y);
-
-            window.setView(View(FloatRect({ 0.f, 0.f }, { width, height })));
-
-
-            if (currentScreen == GAMEPLAY)
+            // RANGE INPUT - ACT 2, LEVEL 4
+            else if (currentScreen == GAMEPLAY &&
+                selectedAct == 2 &&
+                (rangeLowInputActive || rangeHighInputActive))
             {
-                if (selectedAct == 1)
-                    rebuildBinaryVisualTree();
-                else if (selectedAct == 2)
-                    positionGameplayTree();
-                else if (selectedAct == 3)
-                    rebuildAVLVisualTree();
-                else if (selectedAct == 4)
-                    rebuildHeapVisualTree();
-            }
-            else
-            {
-                layoutEngine.calculatePositions(visualRoot, width);
-            }
-        }
-
-        if (const auto* mouse = event->getIf<Event::MouseButtonPressed>())
-        {
-            if (mouse->button == Mouse::Button::Left)
-            {
-                handleMouseClick(mouse->position);
-            }
-        }
-
-        // Handle keyboard input while search field is active
-        if (currentScreen == GAMEPLAY && searchInputActive)
-        {
-            if (const auto* key = event->getIf<Event::KeyPressed>())
-            {
-                if (key->code == Keyboard::Key::Backspace)
+                if (text->unicode >= '0' && text->unicode <= '9')
                 {
-                    if (!searchInput.empty())
+                    if (rangeLowInputActive && rangeLowInput.length() < 9)
                     {
-                        searchInput.pop_back();
+                        rangeLowInput += static_cast<char>(text->unicode);
+                    }
+                    else if (rangeHighInputActive && rangeHighInput.length() < 9)
+                    {
+                        rangeHighInput += static_cast<char>(text->unicode);
                     }
                 }
-                else if (key->code == Keyboard::Key::Enter)
+                else if (text->unicode == 8)
                 {
-                    if (selectedAct == 2)
+                    if (rangeLowInputActive && !rangeLowInput.empty())
                     {
-                        performSearch();
+                        rangeLowInput.pop_back();
+                    }
+                    else if (rangeHighInputActive && !rangeHighInput.empty())
+                    {
+                        rangeHighInput.pop_back();
                     }
                 }
             }
 
-            if (const auto* text = event->getIf<Event::TextEntered>())
+            // NORMAL SEARCH / VALUE INPUT
+            else if (currentScreen == GAMEPLAY && searchInputActive)
             {
                 if (text->unicode >= '0' && text->unicode <= '9')
                 {
@@ -225,10 +205,83 @@ void Game::processEvents()
                         searchInput += static_cast<char>(text->unicode);
                     }
                 }
+                else if (text->unicode == 8 && !searchInput.empty())
+                {
+                    searchInput.pop_back();
+                }
+            }
+        }
+
+        // ---------------------------------
+        // WINDOW RESIZE
+        // ---------------------------------
+        if (const auto* resized = event->getIf<Event::Resized>())
+        {
+            float width = static_cast<float>(resized->size.x);
+            float height = static_cast<float>(resized->size.y);
+
+            window.setView(View(FloatRect({ 0.f, 0.f }, { width, height })));
+
+            if (currentScreen == GAMEPLAY)
+            {
+                if (selectedAct == 1)
+                {
+                    rebuildBinaryVisualTree();
+                }
+                else if (selectedAct == 2)
+                {
+                    positionGameplayTree();
+                }
+                else if (selectedAct == 3)
+                {
+                    rebuildAVLVisualTree();
+                }
+                else if (selectedAct == 4)
+                {
+                    rebuildHeapVisualTree();
+                }
+            }
+            else
+            {
+                layoutEngine.calculatePositions(visualRoot, width);
+            }
+        }
+
+        // ---------------------------------
+        // MOUSE CLICK
+        // ---------------------------------
+        if (const auto* mouse = event->getIf<Event::MouseButtonPressed>())
+        {
+            if (mouse->button == Mouse::Button::Left)
+            {
+                handleMouseClick(mouse->position);
+            }
+        }
+
+        // ---------------------------------
+        // KEYBOARD INPUT
+        // ---------------------------------
+        if (currentScreen == GAMEPLAY)
+        {
+            if (const auto* key = event->getIf<Event::KeyPressed>())
+            {
+                // ENTER KEY
+                if (key->code == Keyboard::Key::Enter)
+                {
+                    // Level 1 - Start BST Search
+                    if (selectedAct == 2 &&
+                        selectedLevel == 1 &&
+                        searchInputActive)
+                    {
+                        searchInputActive = false;
+                        startBSTSearch();
+                    }
+                }
             }
         }
     }
 }
+
 
 
 // Update function
@@ -403,9 +456,46 @@ void Game::handleMouseClick(Vector2i mousePosition)
                 searchInput = "";
                 searchResult = "";
 
+                rangeLowInput = "";
+                rangeHighInput = "";
+                rangeLowInputActive = false;
+                rangeHighInputActive = false;
+
+                bstLevelSuccess = false;
+                bstSearchStarted = false;
+                bstSearchTarget = -1;
+                bstCurrentNode = nullptr;
+                bstComparisons = 0;
+                bstSearchPathLength = 0;
+
+                // Start with an empty BST
+                bst.clear();
+
+                // Levels 1-4 use the original example tree
+                if (selectedLevel != 5)
+                {
+                    bst.insert(50);
+                    bst.insert(30);
+                    bst.insert(70);
+                    bst.insert(20);
+                    bst.insert(40);
+                    bst.insert(60);
+                    bst.insert(80);
+                }
+
+                // Reset Level 3 deletion progress
+                bstLeafDeleted = false;
+                bstOneChildDeleted = false;
+                bstTwoChildrenDeleted = false;
+
+                // Reset Level 5 insertion progress
+                bstLevel5NextValue = 0;
+
+                rebuildVisualTree();
                 clearHighlights(visualRoot);
                 positionGameplayTree();
             }
+
             else if (selectedAct == 4)
             {
                 selectedHeapIndex = -1;
@@ -634,83 +724,86 @@ void Game::handleMouseClick(Vector2i mousePosition)
             }
         }
 
-        else if (selectedAct == 2)
+
+else if (selectedAct == 2)
+{
+    // COMPLETE LEVEL
+    if (isMouseOver(mousePosition, { 800.f, 620.f }, { 170.f, 50.f }))
+    {
+        if (bstLevelSuccess)
         {
-            // Search input field
-            if (isMouseOver(mousePosition, { width - 230.f, 205.f }, { 190.f, 40.f }))
-            {
-                searchInputActive = true;
-            }
-
-            // Search button
-            else if (isMouseOver(mousePosition, { width - 230.f, 260.f }, { 190.f, 38.f }))
-            {
-                searchInputActive = false;
-                performSearch();
-            }
-
-            // Insert button
-            else if (isMouseOver(mousePosition, { width - 230.f, 305.f }, { 190.f, 38.f }))
-            {
-                searchInputActive = false;
-                performInsert();
-            }
-
-            // Delete button
-            else if (isMouseOver(mousePosition, { width - 230.f, 350.f }, { 190.f, 38.f }))
-            {
-                searchInputActive = false;
-                performDelete();
-            }
-
-            // Minimum button
-            else if (isMouseOver(mousePosition, { width - 230.f, 395.f }, { 190.f, 38.f }))
-            {
-                searchInputActive = false;
-                performMinimum();
-            }
-
-            // Maximum button
-            else if (isMouseOver(mousePosition, { width - 230.f, 440.f }, { 190.f, 38.f }))
-            {
-                searchInputActive = false;
-                performMaximum();
-            }
-
-            // Successor
-            else if (isMouseOver(mousePosition, { width - 230.f, 450.f }, { 190.f, 34.f }))
-            {
-                searchInputActive = false;
-                performSuccessor();
-            }
-
-            // Predecessor
-            else if (isMouseOver(mousePosition, { width - 230.f, 488.f }, { 190.f, 34.f }))
-            {
-                searchInputActive = false;
-                performPredecessor();
-            }
-
-            // Back button
-            else if (isMouseOver(mousePosition, { 30.f, 620.f }, { 150.f, 50.f }))
-            {
-                searchInputActive = false;
-                currentScreen = LEVEL_INTRO;
-            }
-
-            // Reset button
-            else if (isMouseOver(mousePosition, { 600.f, 620.f }, { 150.f, 50.f }))
-            {
-                searchInput = "";
-                searchResult = "";
-                searchInputActive = false;
-                clearHighlights(visualRoot);
-            }
-            else
-            {
-                searchInputActive = false;
-            }
+            bstLevelSuccess = false;
+            completeCurrentLevel();
         }
+    }
+
+    // BACK BUTTON
+    else if (isMouseOver(mousePosition, { 30.f, 620.f }, { 150.f, 50.f }))
+    {
+        searchInputActive = false;
+        rangeLowInputActive = false;
+        rangeHighInputActive = false;
+
+        currentScreen = LEVEL_INTRO;
+    }
+
+    // RESET BUTTON
+    else if (isMouseOver(mousePosition, { 600.f, 620.f }, { 150.f, 50.f }))
+    {
+        if (selectedLevel == 4)
+        {
+            resetRangeRaid();
+        }
+
+        searchInput = "";
+        searchResult = "";
+        searchInputActive = false;
+
+        rangeLowInput = "";
+        rangeHighInput = "";
+        rangeLowInputActive = false;
+        rangeHighInputActive = false;
+
+        bstLevelSuccess = false;
+        bstSearchStarted = false;
+        bstSearchTarget = -1;
+        bstCurrentNode = nullptr;
+        bstComparisons = 0;
+        bstSearchPathLength = 0;
+
+        clearHighlights(visualRoot);
+    }
+
+    // LEVEL 1 - SEARCH HEIST
+    else if (selectedLevel == 1)
+    {
+        handleBSTLevel1Click(mousePosition);
+    }
+
+    // LEVEL 2 - STASH LOOT
+    else if (selectedLevel == 2)
+    {
+        handleBSTLevel2Click(mousePosition);
+    }
+
+    // LEVEL 3 - STEAL AND COLLAPSE
+    else if (selectedLevel == 3)
+    {
+        handleBSTLevel3Click(mousePosition);
+    }
+
+    // LEVEL 4 - RANGE RAID
+    else if (selectedLevel == 4)
+    {
+        handleBSTLevel4Click(mousePosition);
+    }
+
+    // LEVEL 5 - THE LAZY ARCHITECT
+    else if (selectedLevel == 5)
+    {
+        handleBSTLevel5Click(mousePosition);
+    }
+}
 
         else if (selectedAct == 1)
         {
@@ -1236,121 +1329,121 @@ void Game::drawLevelIntro()
 }
 
 
-// Draw gameplay screen
 void Game::drawGameplay()
 {
-    float width = static_cast<float>(window.getSize().x);
-
-    // Top HUD
-    drawPanel({ 20.f, 15.f }, { width - 40.f, 65.f });
-
-    drawText("LEVEL " + to_string(selectedLevel), { 40.f, 35.f }, 22);
-    drawText("BST ACT", { width - 180.f, 35.f }, 22);
-
-    // Mission panel
-    drawPanel({ 20.f, 100.f }, { 230.f, 470.f });
-
-    drawText("MISSION", { 40.f, 120.f }, 25);
-
-    //drawText("EVENT LOG", { width - 230.f, 430.f }, 20);
-
-    //drawText(searchResult, { width - 230.f, 465.f }, 15);
-
-    if (selectedLevel == 1)
+    // ACT 1 - BINARY TREE
+    if (selectedAct == 1)
     {
-        drawText("Find the target", { 40.f, 175.f }, 18);
-        drawText("value in the BST.", { 40.f, 205.f }, 18);
-        drawText("Search any value", { 40.f, 270.f }, 16);
-    }
-    else if (selectedLevel == 2)
-    {
-        drawText("Insert a value", { 40.f, 175.f }, 18);
-        drawText("into the BST.", { 40.f, 205.f }, 18);
-    }
-    else if (selectedLevel == 3)
-    {
-        drawText("Delete a value", { 40.f, 175.f }, 18);
-        drawText("from the BST.", { 40.f, 205.f }, 18);
-    }
-    else if (selectedLevel == 4)
-    {
-        drawText("Follow the", { 40.f, 175.f }, 18);
-        drawText("traversal order.", { 40.f, 205.f }, 18);
-    }
-    else
-    {
-        drawText("Complete the", { 40.f, 175.f }, 18);
-        drawText("BST challenge.", { 40.f, 205.f }, 18);
+        drawBinaryGameplay();
     }
 
-    // Tree visualization panel
-    drawPanel({ 270.f, 100.f }, { width - 540.f, 470.f });
-
-    drawText("TREE VISUALIZATION", { 290.f, 115.f }, 20);
-
-    renderer.drawTree(window, visualRoot);
-
-    // Operations panel
-    drawPanel({ width - 250.f, 100.f }, { 230.f, 470.f });
-
-    drawText("OPERATIONS", { width - 230.f, 120.f }, 23);
-
-    drawText("SEARCH VALUE", { width - 230.f, 175.f }, 17);
-
-    // Search input field
-    RectangleShape inputBox({ 190.f, 40.f });
-    inputBox.setPosition({ width - 230.f, 205.f });
-    inputBox.setFillColor(Color(18, 22, 35));
-
-    if (searchInputActive)
+    // ACT 2 - BST
+    else if (selectedAct == 2)
     {
-        inputBox.setOutlineColor(Color(70, 180, 240));
+        float width = static_cast<float>(window.getSize().x);
+
+        // Top HUD
+        drawPanel({ 20.f, 15.f }, { width - 40.f, 65.f });
+        drawText("LEVEL " + to_string(selectedLevel), { 40.f, 35.f }, 22);
+        drawText("BST ACT", { width - 180.f, 35.f }, 22);
+
+        // Mission panel
+        drawPanel({ 20.f, 100.f }, { 230.f, 470.f });
+        drawText("MISSION", { 40.f, 120.f }, 25);
+
+        if (selectedLevel == 1)
+        {
+            drawText("SEARCH HEIST", { 40.f, 170.f }, 18);
+            drawText("Find the target", { 40.f, 210.f }, 16);
+            drawText("using BST rules.", { 40.f, 235.f }, 16);
+            drawText("Choose LEFT or", { 40.f, 280.f }, 16);
+            drawText("RIGHT at each", { 40.f, 305.f }, 16);
+            drawText("comparison.", { 40.f, 330.f }, 16);
+        }
+        else if (selectedLevel == 2)
+        {
+            drawText("STASH LOOT", { 40.f, 170.f }, 18);
+            drawText("Insert a new value", { 40.f, 210.f }, 16);
+            drawText("in its correct BST", { 40.f, 235.f }, 16);
+            drawText("position.", { 40.f, 260.f }, 16);
+        }
+        else if (selectedLevel == 3)
+        {
+            drawText("STEAL AND", { 40.f, 170.f }, 18);
+            drawText("COLLAPSE", { 40.f, 195.f }, 18);
+            drawText("Learn the three", { 40.f, 245.f }, 16);
+            drawText("BST deletion cases.", { 40.f, 270.f }, 16);
+        }
+        else if (selectedLevel == 4)
+        {
+            drawText("RANGE RAID", { 40.f, 170.f }, 18);
+            drawText("Find all values", { 40.f, 210.f }, 16);
+            drawText("inside the given", { 40.f, 235.f }, 16);
+            drawText("range.", { 40.f, 260.f }, 16);
+            drawText("Skip unnecessary", { 40.f, 305.f }, 16);
+            drawText("subtrees.", { 40.f, 330.f }, 16);
+        }
+        else if (selectedLevel == 5)
+        {
+            drawText("LAZY ARCHITECT", { 40.f, 170.f }, 18);
+            drawText("Insert values in", { 40.f, 210.f }, 16);
+            drawText("sorted order and", { 40.f, 235.f }, 16);
+            drawText("observe how the", { 40.f, 260.f }, 16);
+            drawText("BST becomes", { 40.f, 285.f }, 16);
+            drawText("unbalanced.", { 40.f, 310.f }, 16);
+        }
+
+        // Tree visualization panel
+        drawPanel({ 270.f, 100.f }, { width - 540.f, 470.f });
+        drawText("TREE VISUALIZATION", { 290.f, 115.f }, 20);
+
+        renderer.drawTree(window, visualRoot);
+
+        // Operations panel
+        drawPanel({ width - 250.f, 100.f }, { 230.f, 470.f });
+
+        // Draw the interface for the selected BST level
+        if (selectedLevel == 1)
+        {
+            drawBSTLevel1();
+        }
+        else if (selectedLevel == 2)
+        {
+            drawBSTLevel2();
+        }
+        else if (selectedLevel == 3)
+        {
+            drawBSTLevel3();
+        }
+        else if (selectedLevel == 4)
+        {
+            drawBSTLevel4();
+        }
+        else if (selectedLevel == 5)
+        {
+            drawBSTLevel5();
+        }
+
+        // Bottom toolbar
+        drawButton("BACK", { 30.f, 620.f }, { 150.f, 50.f });
+        drawButton("UNDO", { 220.f, 620.f }, { 150.f, 50.f });
+        drawButton("HINT", { 410.f, 620.f }, { 150.f, 50.f });
+        drawButton("RESET", { 600.f, 620.f }, { 150.f, 50.f });
+        drawButton("COMPLETE LEVEL", { 800.f, 620.f }, { 170.f, 50.f },
+            bstLevelSuccess);
     }
-    else
+
+    // ACT 3 - AVL TREE
+    else if (selectedAct == 3)
     {
-        inputBox.setOutlineColor(Color(100, 120, 145));
+        drawAVLGameplay();
     }
 
-    inputBox.setOutlineThickness(2.f);
-    window.draw(inputBox);
-
-    if (searchInput.empty())
+    // ACT 4 - MAX HEAP
+    else if (selectedAct == 4)
     {
-        drawText("Enter value...", { width - 220.f, 215.f }, 15);
+        drawHeapGameplay();
     }
-    else
-    {
-        drawText(searchInput, { width - 220.f, 215.f }, 18);
-    }
-
-    drawButton("SEARCH", { width - 230.f, 260.f }, { 190.f, 34.f });
-    drawButton("INSERT", { width - 230.f, 298.f }, { 190.f, 34.f });
-    drawButton("DELETE", { width - 230.f, 336.f }, { 190.f, 34.f });
-    drawButton("MINIMUM", { width - 230.f, 374.f }, { 190.f, 34.f });
-    drawButton("MAXIMUM", { width - 230.f, 412.f }, { 190.f, 34.f });
-    drawButton("SUCCESSOR", { width - 230.f, 450.f }, { 190.f, 34.f });
-    drawButton("PREDECESSOR", { width - 230.f, 488.f }, { 190.f, 34.f });
-
-    drawText("EVENT LOG", { width - 230.f, 530.f }, 16);
-
-    drawText(searchResult, { width - 230.f, 552.f }, 13);
-
-    if (searchResult.empty())
-    {
-        drawText("Waiting for action...", { width - 230.f, 430.f }, 14);
-    }
-    else
-    {
-        drawText(searchResult, { width - 230.f, 430.f }, 14);
-    }
-
-    // Bottom toolbar
-    drawButton("BACK", { 30.f, 620.f }, { 150.f, 50.f });
-    drawButton("UNDO", { 220.f, 620.f }, { 150.f, 50.f });
-    drawButton("HINT", { 410.f, 620.f }, { 150.f, 50.f });
-    drawButton("RESET", { 600.f, 620.f }, { 150.f, 50.f });
-
-    drawButton("COMPLETE LEVEL", { 800.f, 620.f }, { 170.f, 50.f }, binaryLevelSuccess);
 }
 
 
@@ -2387,4 +2480,981 @@ void Game::handleResultClick(Vector2i mousePosition)
     {
         currentScreen = CAMPAIGN_MAP;
     }
+}
+
+
+void Game::startBSTSearch()
+{
+    if (searchInput.empty())
+    {
+        searchResult = "Enter a target value first.";
+        return;
+    }
+
+    bstSearchTarget = stoi(searchInput);
+
+    bstCurrentNode = bst.getRoot();
+
+    bstComparisons = 0;
+    bstSearchPathLength = 0;
+
+    bstLevelSuccess = false;
+    bstSearchStarted = true;
+
+    clearHighlights(visualRoot);
+
+    if (bstCurrentNode == nullptr)
+    {
+        searchResult = "BST is empty!";
+        bstSearchStarted = false;
+        return;
+    }
+
+    // Examine the root node
+    bstComparisons++;
+
+    bstSearchPath[bstSearchPathLength] = bstCurrentNode->data;
+    bstSearchPathLength++;
+
+    highlightNode(visualRoot, bstCurrentNode->data);
+
+    if (bstCurrentNode->data == bstSearchTarget)
+    {
+        searchResult = "Target found!";
+        bstLevelSuccess = true;
+        bstSearchStarted = false;
+    }
+    else
+    {
+        searchResult = "At " + to_string(bstCurrentNode->data) +
+            ". Choose LEFT or RIGHT.";
+    }
+}
+
+
+void Game::moveBSTLeft()
+{
+    if (!bstSearchStarted || bstCurrentNode == nullptr)
+    {
+        return;
+    }
+
+    // Left is correct only if target is smaller
+    if (bstSearchTarget >= bstCurrentNode->data)
+    {
+        searchResult = "Wrong direction! Choose RIGHT.";
+        return;
+    }
+
+    // Move to left child
+    bstCurrentNode = bstCurrentNode->left;
+
+    if (bstCurrentNode == nullptr)
+    {
+        searchResult = "Target not found! Left child is empty.";
+        bstSearchStarted = false;
+        return;
+    }
+
+    bstComparisons++;
+
+    bstSearchPath[bstSearchPathLength] = bstCurrentNode->data;
+    bstSearchPathLength++;
+
+    highlightNode(visualRoot, bstCurrentNode->data);
+
+    if (bstCurrentNode->data == bstSearchTarget)
+    {
+        searchResult = "Target found!";
+        bstLevelSuccess = true;
+        bstSearchStarted = false;
+    }
+    else
+    {
+        searchResult = "At " + to_string(bstCurrentNode->data) +
+            ". Choose LEFT or RIGHT.";
+    }
+}
+
+
+void Game::moveBSTRight()
+{
+    if (!bstSearchStarted || bstCurrentNode == nullptr)
+    {
+        return;
+    }
+
+    // Right is correct only if target is larger
+    if (bstSearchTarget <= bstCurrentNode->data)
+    {
+        searchResult = "Wrong direction! Choose LEFT.";
+        return;
+    }
+
+    // Move to right child
+    bstCurrentNode = bstCurrentNode->right;
+
+    if (bstCurrentNode == nullptr)
+    {
+        searchResult = "Target not found! Right child is empty.";
+        bstSearchStarted = false;
+        return;
+    }
+
+    bstComparisons++;
+
+    bstSearchPath[bstSearchPathLength] = bstCurrentNode->data;
+    bstSearchPathLength++;
+
+    highlightNode(visualRoot, bstCurrentNode->data);
+
+    if (bstCurrentNode->data == bstSearchTarget)
+    {
+        searchResult = "Target found!";
+        bstLevelSuccess = true;
+        bstSearchStarted = false;
+    }
+    else
+    {
+        searchResult = "At " + to_string(bstCurrentNode->data) +
+            ". Choose LEFT or RIGHT.";
+    }
+}
+
+void Game::performRangeQuery()
+{
+    if (rangeLowInput.empty() || rangeHighInput.empty())
+    {
+        searchResult = "Enter both range limits.";
+        return;
+    }
+
+    int low = stoi(rangeLowInput);
+    int high = stoi(rangeHighInput);
+
+    if (low > high)
+    {
+        searchResult = "Invalid range!";
+        return;
+    }
+
+    int output[100];
+    int count = 0;
+
+    bst.rangeQuery(low, high, output, count);
+
+    searchResult = "Range: ";
+
+    for (int i = 0; i < count; i++)
+    {
+        searchResult += to_string(output[i]);
+
+        if (i < count - 1)
+            searchResult += ", ";
+    }
+
+    if (count == 0)
+        searchResult = "No values in this range.";
+}
+
+void Game::startRangeRaid()
+{
+    if (rangeLowInput.empty() || rangeHighInput.empty())
+    {
+        searchResult = "Enter both range limits.";
+        return;
+    }
+
+    rangeLow = stoi(rangeLowInput);
+    rangeHigh = stoi(rangeHighInput);
+
+    if (rangeLow > rangeHigh)
+    {
+        searchResult = "Lower limit must be smaller.";
+        return;
+    }
+
+    // Reset traversal information.
+    rangeStackTop = -1;
+    rangeResultCount = 0;
+
+    rangeNodesVisited = 0;
+    rangeSubtreesPruned = 0;
+    rangeCorrectDecisions = 0;
+    rangeWrongDecisions = 0;
+
+    rangeCurrentNode = nullptr;
+    rangeDecisionType = 0;
+
+    rangeQueryFinished = false;
+    rangeQueryStarted = true;
+
+    // Start traversal from the root.
+    if (bst.getRoot() != nullptr)
+    {
+        rangeStack[++rangeStackTop] = bst.getRoot();
+    }
+
+    searchResult = "Range raid started!";
+
+    prepareNextRangeNode();
+}
+
+void Game::prepareNextRangeNode()
+{
+    rangeCurrentNode = nullptr;
+
+    if (rangeStackTop < 0)
+    {
+        finishRangeRaid();
+        return;
+    }
+
+    rangeCurrentNode = rangeStack[rangeStackTop--];
+
+    rangeNodesVisited++;
+
+    if (rangeCurrentNode->data < rangeLow)
+    {
+        rangeDecisionType = 1;
+    }
+    else if (rangeCurrentNode->data > rangeHigh)
+    {
+        rangeDecisionType = 2;
+    }
+    else
+    {
+        rangeDecisionType = 3;
+    }
+}
+
+void Game::handleRangeDecision(int decision)
+{
+    if (!rangeQueryStarted || rangeQueryFinished ||
+        rangeCurrentNode == nullptr)
+    {
+        return;
+    }
+
+    if (decision != rangeDecisionType)
+    {
+        rangeWrongDecisions++;
+        searchResult = "Incorrect decision! Try again.";
+        return;
+    }
+
+    rangeCorrectDecisions++;
+
+    if (rangeDecisionType == 1)
+    {
+        // Current node is smaller than the lower limit.
+        // Its entire left subtree can be skipped.
+
+        rangeSubtreesPruned++;
+
+        if (rangeCurrentNode->right != nullptr)
+        {
+            rangeStack[++rangeStackTop] = rangeCurrentNode->right;
+        }
+
+        searchResult = "Correct! Skip the left subtree.";
+    }
+    else if (rangeDecisionType == 2)
+    {
+        // Current node is greater than the upper limit.
+        // Its entire right subtree can be skipped.
+
+        rangeSubtreesPruned++;
+
+        if (rangeCurrentNode->left != nullptr)
+        {
+            rangeStack[++rangeStackTop] = rangeCurrentNode->left;
+        }
+
+        searchResult = "Correct! Skip the right subtree.";
+    }
+    else
+    {
+        // Current node is inside the requested range.
+
+        rangeResults[rangeResultCount++] = rangeCurrentNode->data;
+
+        // Push right first so that left is processed first.
+        if (rangeCurrentNode->right != nullptr)
+        {
+            rangeStack[++rangeStackTop] = rangeCurrentNode->right;
+        }
+
+        if (rangeCurrentNode->left != nullptr)
+        {
+            rangeStack[++rangeStackTop] = rangeCurrentNode->left;
+        }
+
+        searchResult = "Correct! Explore both subtrees.";
+    }
+
+    prepareNextRangeNode();
+}
+
+void Game::finishRangeRaid()
+{
+    rangeCurrentNode = nullptr;
+    rangeQueryFinished = true;
+
+    // Sort results in ascending order.
+    for (int i = 1; i < rangeResultCount; i++)
+    {
+        int key = rangeResults[i];
+        int j = i - 1;
+
+        while (j >= 0 && rangeResults[j] > key)
+        {
+            rangeResults[j + 1] = rangeResults[j];
+            j--;
+        }
+
+        rangeResults[j + 1] = key;
+    }
+
+    searchResult = "Range raid completed!";
+
+    bstLevelSuccess = true;
+}
+
+void Game::resetRangeRaid()
+{
+    rangeLowInput = "";
+    rangeHighInput = "";
+
+    rangeLowInputActive = false;
+    rangeHighInputActive = false;
+
+    rangeLow = 0;
+    rangeHigh = 0;
+
+    rangeQueryStarted = false;
+    rangeQueryFinished = false;
+
+    rangeCurrentNode = nullptr;
+
+    rangeStackTop = -1;
+    rangeResultCount = 0;
+
+    rangeNodesVisited = 0;
+    rangeSubtreesPruned = 0;
+    rangeCorrectDecisions = 0;
+    rangeWrongDecisions = 0;
+
+    rangeDecisionType = 0;
+
+    bstLevelSuccess = false;
+    searchResult = "";
+}
+
+
+void Game::drawBSTLevel1()
+{
+    float width = static_cast<float>(window.getSize().x);
+
+    drawText("SEARCH HEIST", { width - 230.f, 120.f }, 21);
+    drawText("TARGET VALUE", { width - 230.f, 175.f }, 16);
+
+    RectangleShape inputBox({ 190.f, 40.f });
+    inputBox.setPosition({ width - 230.f, 205.f });
+    inputBox.setFillColor(Color(18, 22, 35));
+    inputBox.setOutlineColor(searchInputActive ?
+        Color(70, 180, 240) : Color(100, 120, 145));
+    inputBox.setOutlineThickness(2.f);
+    window.draw(inputBox);
+
+    drawText(searchInput.empty() ? "Enter value..." : searchInput,
+        { width - 220.f, 215.f }, 18);
+
+    drawButton("START SEARCH",
+        { width - 230.f, 260.f }, { 190.f, 38.f });
+
+    drawButton("GO LEFT",
+        { width - 230.f, 310.f }, { 190.f, 38.f });
+
+    drawButton("GO RIGHT",
+        { width - 230.f, 355.f }, { 190.f, 38.f });
+
+    drawText("COMPARISONS: " + to_string(bstComparisons),
+        { width - 230.f, 410.f }, 15);
+
+    string pathText = "PATH: ";
+
+    for (int i = 0; i < bstSearchPathLength; i++)
+    {
+        pathText += to_string(bstSearchPath[i]);
+
+        if (i < bstSearchPathLength - 1)
+            pathText += " -> ";
+    }
+
+    drawText(pathText, { width - 230.f, 440.f }, 13);
+    drawText(searchResult, { width - 230.f, 475.f }, 13);
+}
+
+void Game::drawBSTLevel2()
+{
+    float width = static_cast<float>(window.getSize().x);
+
+    drawText("STASH LOOT", { width - 230.f, 120.f }, 21);
+    drawText("VALUE TO INSERT", { width - 230.f, 175.f }, 16);
+
+    RectangleShape inputBox({ 190.f, 40.f });
+    inputBox.setPosition({ width - 230.f, 205.f });
+    inputBox.setFillColor(Color(18, 22, 35));
+    inputBox.setOutlineColor(searchInputActive ?
+        Color(70, 180, 240) : Color(100, 120, 145));
+    inputBox.setOutlineThickness(2.f);
+    window.draw(inputBox);
+
+    drawText(searchInput.empty() ? "Enter value..." : searchInput,
+        { width - 220.f, 215.f }, 18);
+
+    drawButton("INSERT VALUE",
+        { width - 230.f, 265.f }, { 190.f, 40.f });
+
+    drawText("BST RULE:", { width - 230.f, 340.f }, 15);
+    drawText("Smaller = LEFT", { width - 230.f, 370.f }, 14);
+    drawText("Larger = RIGHT", { width - 230.f, 395.f }, 14);
+
+    drawText(searchResult, { width - 230.f, 455.f }, 13);
+}
+
+void Game::drawBSTLevel3()
+{
+    float width = static_cast<float>(window.getSize().x);
+
+    int target = 20;
+
+    if (bstLeafDeleted)
+        target = 30;
+
+    if (bstOneChildDeleted)
+        target = 50;
+
+    drawText("STEAL AND COLLAPSE", { width - 230.f, 120.f }, 19);
+
+    drawText("TARGET NODE:", { width - 230.f, 165.f }, 16);
+    drawText(to_string(target), { width - 230.f, 190.f }, 23);
+
+    drawText("1. Select the target", { width - 230.f, 230.f }, 15);
+
+    if (bstDeleteSelectedNode == nullptr)
+    {
+        drawText("Click the target", { width - 230.f, 255.f }, 14);
+        drawText("node in the tree.", { width - 230.f, 275.f }, 14);
+    }
+    else
+    {
+        drawText("Selected: " + to_string(bstDeleteSelectedNode->value),
+            { width - 230.f, 255.f }, 15);
+
+        drawText("2. Choose its case:", { width - 230.f, 290.f }, 15);
+
+        drawButton("LEAF (0 CHILDREN)",
+            { width - 230.f, 315.f }, { 190.f, 35.f });
+
+        drawButton("ONE CHILD",
+            { width - 230.f, 355.f }, { 190.f, 35.f });
+
+        drawButton("TWO CHILDREN",
+            { width - 230.f, 395.f }, { 190.f, 35.f });
+    }
+
+    if (bstDeleteAwaitingConfirmation)
+    {
+        drawText("Successor: " + to_string(bstDeleteSuccessor),
+            { width - 230.f, 440.f }, 14);
+
+        drawButton("CONFIRM DELETE",
+            { width - 230.f, 475.f }, { 190.f, 35.f });
+    }
+
+    drawText(searchResult, { width - 230.f, 525.f }, 13);
+
+    int completed = 0;
+
+    if (bstLeafDeleted)
+        completed++;
+
+    if (bstOneChildDeleted)
+        completed++;
+
+    if (bstTwoChildrenDeleted)
+        completed++;
+
+    drawText("Missions: " + to_string(completed) + "/3",
+        { width - 230.f, 555.f }, 15);
+}
+
+void Game::drawBSTLevel4()
+{
+    float width = static_cast<float>(window.getSize().x);
+
+    drawText("RANGE RAID", { width - 230.f, 120.f }, 20);
+
+    if (!rangeQueryStarted)
+    {
+        drawText("Enter lower limit:", { width - 230.f, 175.f }, 15);
+
+        drawPanel({ width - 230.f, 200.f }, { 190.f, 35.f });
+        drawText(rangeLowInput, { width - 220.f, 207.f }, 17);
+
+        drawText("Enter upper limit:", { width - 230.f, 250.f }, 15);
+
+        drawPanel({ width - 230.f, 280.f }, { 190.f, 35.f });
+        drawText(rangeHighInput, { width - 220.f, 287.f }, 17);
+
+        drawButton("START RAID",
+            { width - 230.f, 335.f }, { 190.f, 40.f });
+    }
+    else
+    {
+        drawText("Range: [" + to_string(rangeLow) + ", " +
+            to_string(rangeHigh) + "]",
+            { width - 230.f, 170.f }, 16);
+
+        if (!rangeQueryFinished && rangeCurrentNode != nullptr)
+        {
+            drawText("Current node:",
+                { width - 230.f, 210.f }, 15);
+
+            drawText(to_string(rangeCurrentNode->data),
+                { width - 230.f, 235.f }, 22);
+
+            drawText("Choose an action:",
+                { width - 230.f, 280.f }, 15);
+
+            drawButton("EXPLORE BOTH",
+                { width - 230.f, 315.f }, { 190.f, 35.f });
+
+            drawButton("SKIP LEFT",
+                { width - 230.f, 355.f }, { 190.f, 35.f });
+
+            drawButton("SKIP RIGHT",
+                { width - 230.f, 395.f }, { 190.f, 35.f });
+        }
+        else if (rangeQueryFinished)
+        {
+            drawText("RAID COMPLETE!",
+                { width - 230.f, 220.f }, 18);
+
+            string values = "Values: ";
+
+            for (int i = 0; i < rangeResultCount; i++)
+            {
+                values += to_string(rangeResults[i]);
+
+                if (i < rangeResultCount - 1)
+                    values += ", ";
+            }
+
+            if (rangeResultCount == 0)
+                values += "None";
+
+            drawText(values, { width - 230.f, 260.f }, 14);
+        }
+
+        drawText("Visited: " + to_string(rangeNodesVisited),
+            { width - 230.f, 455.f }, 14);
+
+        drawText("Pruned: " + to_string(rangeSubtreesPruned),
+            { width - 230.f, 480.f }, 14);
+
+        drawText("Correct: " + to_string(rangeCorrectDecisions),
+            { width - 230.f, 505.f }, 14);
+
+        drawText("Mistakes: " + to_string(rangeWrongDecisions),
+            { width - 230.f, 530.f }, 14);
+    }
+
+    drawText(searchResult, { width - 230.f, 560.f }, 12);
+}
+
+void Game::drawBSTLevel5()
+{
+    float width = static_cast<float>(window.getSize().x);
+
+    drawText("THE LAZY", { width - 230.f, 120.f }, 21);
+    drawText("ARCHITECT", { width - 230.f, 145.f }, 21);
+
+    drawText("INSERT IN ORDER", { width - 230.f, 200.f }, 16);
+
+    RectangleShape inputBox({ 190.f, 40.f });
+    inputBox.setPosition({ width - 230.f, 230.f });
+    inputBox.setFillColor(Color(18, 22, 35));
+    inputBox.setOutlineColor(searchInputActive ?
+        Color(70, 180, 240) : Color(100, 120, 145));
+    inputBox.setOutlineThickness(2.f);
+    window.draw(inputBox);
+
+    drawText(searchInput.empty() ? "Enter value..." : searchInput,
+        { width - 220.f, 240.f }, 18);
+
+    drawButton("INSERT VALUE",
+        { width - 230.f, 290.f }, { 190.f, 40.f });
+
+    drawText("Build a degenerate", { width - 230.f, 365.f }, 14);
+    drawText("BST using sorted", { width - 230.f, 390.f }, 14);
+    drawText("insertion order.", { width - 230.f, 415.f }, 14);
+
+    drawText(searchResult, { width - 230.f, 465.f }, 13);
+}
+
+void Game::handleBSTLevel1Click(Vector2i mousePosition)
+{
+    float width = static_cast<float>(window.getSize().x);
+
+    // Target input field
+    if (isMouseOver(mousePosition, { width - 230.f, 205.f }, { 190.f, 40.f }))
+    {
+        searchInputActive = true;
+    }
+
+    // Start Search
+    else if (isMouseOver(mousePosition, { width - 230.f, 260.f }, { 190.f, 38.f }))
+    {
+        searchInputActive = false;
+        startBSTSearch();
+    }
+
+    // Go Left
+    else if (isMouseOver(mousePosition, { width - 230.f, 310.f }, { 190.f, 38.f }))
+    {
+        searchInputActive = false;
+        moveBSTLeft();
+    }
+
+    // Go Right
+    else if (isMouseOver(mousePosition, { width - 230.f, 355.f }, { 190.f, 38.f }))
+    {
+        searchInputActive = false;
+        moveBSTRight();
+    }
+}
+
+void Game::handleBSTLevel2Click(Vector2i mousePosition)
+{
+    float width = static_cast<float>(window.getSize().x);
+
+    // Value input field
+    if (isMouseOver(mousePosition, { width - 230.f, 205.f }, { 190.f, 40.f }))
+    {
+        searchInputActive = true;
+    }
+
+    // Insert Value
+    else if (isMouseOver(mousePosition, { width - 230.f, 265.f }, { 190.f, 40.f }))
+    {
+        searchInputActive = false;
+
+        if (searchInput.empty())
+        {
+            searchResult = "Enter a value first.";
+            return;
+        }
+
+        int value = stoi(searchInput);
+
+        int path[100];
+        int pathLength = 0;
+
+        // Check whether the value already exists
+        if (bst.search(value, path, &pathLength))
+        {
+            searchResult = "Duplicates are not allowed!";
+            searchInput = "";
+            return;
+        }
+
+        bst.insert(value);
+
+        rebuildVisualTree();
+        positionGameplayTree();
+
+        searchResult = "Inserted " + to_string(value) + " successfully!";
+        bstLevelSuccess = true;
+
+        searchInput = "";
+    }
+}
+
+void Game::handleBSTLevel3Click(Vector2i mousePosition)
+{
+    float width = static_cast<float>(window.getSize().x);
+
+    // STEP 1: Select the target node from the tree.
+    if (!bstDeleteAwaitingConfirmation &&
+        isMouseOver(mousePosition, { 270.f, 100.f },
+            { width - 540.f, 470.f }))
+    {
+        VisualNode* clickedNode = findClickedNode(
+            visualRoot, mousePosition);
+
+        if (clickedNode == nullptr)
+            return;
+
+        int target = 20;
+
+        if (bstLeafDeleted)
+            target = 30;
+
+        if (bstOneChildDeleted)
+            target = 50;
+
+        if (clickedNode->value != target)
+        {
+            searchResult = "Select target " + to_string(target);
+            bstDeleteSelectedNode = nullptr;
+            return;
+        }
+
+        bstDeleteSelectedNode = clickedNode;
+        bstDeleteCaseSelected = 0;
+        searchResult = "Target selected. Choose its case.";
+        return;
+    }
+
+    // Do not allow deletion if no target is selected.
+    if (bstDeleteSelectedNode == nullptr)
+        return;
+
+    int leftChildren = (bstDeleteSelectedNode->left != nullptr) ? 1 : 0;
+    int rightChildren = (bstDeleteSelectedNode->right != nullptr) ? 1 : 0;
+
+    int actualCase = leftChildren + rightChildren;
+
+    // STEP 2: Choose the deletion case.
+    if (!bstDeleteAwaitingConfirmation)
+    {
+        if (isMouseOver(mousePosition,
+            { width - 230.f, 315.f }, { 190.f, 35.f }))
+        {
+            bstDeleteCaseSelected = 1;
+        }
+        else if (isMouseOver(mousePosition,
+            { width - 230.f, 355.f }, { 190.f, 35.f }))
+        {
+            bstDeleteCaseSelected = 2;
+        }
+        else if (isMouseOver(mousePosition,
+            { width - 230.f, 395.f }, { 190.f, 35.f }))
+        {
+            bstDeleteCaseSelected = 3;
+        }
+        else
+        {
+            return;
+        }
+
+        if (bstDeleteCaseSelected != actualCase + 1)
+        {
+            searchResult = "Incorrect deletion case. Try again.";
+            bstDeleteCaseSelected = 0;
+            return;
+        }
+
+        // Correct case selected.
+        bstDeleteAwaitingConfirmation = true;
+
+        if (bstDeleteCaseSelected == 1)
+        {
+            searchResult = "Correct! This is a leaf node.";
+        }
+        else if (bstDeleteCaseSelected == 2)
+        {
+            searchResult = "Correct! This node has one child.";
+        }
+        else if (bstDeleteCaseSelected == 3)
+        {
+            // Find inorder successor: leftmost node
+            // in the selected node's right subtree.
+            VisualNode* successor = bstDeleteSelectedNode->right;
+
+            while (successor->left != nullptr)
+            {
+                successor = successor->left;
+            }
+
+            bstDeleteSuccessor = successor->value;
+
+            searchResult = "Correct! Find the successor.";
+        }
+
+        return;
+    }
+
+    // STEP 3: Confirm deletion.
+    if (isMouseOver(mousePosition,
+        { width - 230.f, 475.f }, { 190.f, 35.f }))
+    {
+        int deletedValue = bstDeleteSelectedNode->value;
+
+        if (bst.deleteValue(deletedValue))
+        {
+            if (bstDeleteCaseSelected == 1)
+            {
+                bstLeafDeleted = true;
+                searchResult = "Leaf node deleted!";
+            }
+            else if (bstDeleteCaseSelected == 2)
+            {
+                bstOneChildDeleted = true;
+                searchResult = "One-child node deleted!";
+            }
+            else if (bstDeleteCaseSelected == 3)
+            {
+                bstTwoChildrenDeleted = true;
+
+                searchResult = "Deleted! Successor was " +
+                    to_string(bstDeleteSuccessor);
+            }
+
+            rebuildVisualTree();
+            positionGameplayTree();
+
+            bstDeleteSelectedNode = nullptr;
+            bstDeleteCaseSelected = 0;
+            bstDeleteAwaitingConfirmation = false;
+            bstDeleteSuccessor = -1;
+
+            bstLevelSuccess = bstLeafDeleted &&
+                bstOneChildDeleted &&
+                bstTwoChildrenDeleted;
+        }
+    }
+}
+
+void Game::handleBSTLevel4Click(Vector2i mousePosition)
+{
+    float width = static_cast<float>(window.getSize().x);
+
+    // BEFORE STARTING THE RAID
+    if (!rangeQueryStarted)
+    {
+        if (isMouseOver(mousePosition,
+            { width - 230.f, 200.f }, { 190.f, 35.f }))
+        {
+            rangeLowInputActive = true;
+            rangeHighInputActive = false;
+        }
+        else if (isMouseOver(mousePosition,
+            { width - 230.f, 280.f }, { 190.f, 35.f }))
+        {
+            rangeHighInputActive = true;
+            rangeLowInputActive = false;
+        }
+        else if (isMouseOver(mousePosition,
+            { width - 230.f, 335.f }, { 190.f, 40.f }))
+        {
+            rangeLowInputActive = false;
+            rangeHighInputActive = false;
+
+            startRangeRaid();
+        }
+
+        return;
+    }
+
+    // AFTER STARTING THE RAID
+    if (rangeQueryFinished)
+        return;
+
+    if (isMouseOver(mousePosition,
+        { width - 230.f, 315.f }, { 190.f, 35.f }))
+    {
+        handleRangeDecision(3);
+    }
+    else if (isMouseOver(mousePosition,
+        { width - 230.f, 355.f }, { 190.f, 35.f }))
+    {
+        handleRangeDecision(1);
+    }
+    else if (isMouseOver(mousePosition,
+        { width - 230.f, 395.f }, { 190.f, 35.f }))
+    {
+        handleRangeDecision(2);
+    }
+}
+
+void Game::handleBSTLevel5Click(Vector2i mousePosition)
+{
+    float width = static_cast<float>(window.getSize().x);
+
+    // Value input field
+    if (isMouseOver(mousePosition, { width - 230.f, 230.f }, { 190.f, 40.f }))
+    {
+        searchInputActive = true;
+    }
+
+    // Insert Value
+    else if (isMouseOver(mousePosition, { width - 230.f, 290.f }, { 190.f, 40.f }))
+    {
+        searchInputActive = false;
+
+        if (searchInput.empty())
+        {
+            searchResult = "Enter the next value.";
+            return;
+        }
+
+        if (bstLevel5NextValue >= 5)
+        {
+            searchResult = "All five values inserted!";
+            return;
+        }
+
+        int value = stoi(searchInput);
+        int expected = bstLevel5Values[bstLevel5NextValue];
+
+        if (value != expected)
+        {
+            searchResult = "Next required value: " + to_string(expected);
+            searchInput = "";
+            return;
+        }
+
+        bst.insert(value);
+
+        bstLevel5NextValue++;
+
+        rebuildVisualTree();
+        positionGameplayTree();
+
+        searchResult = "Inserted " + to_string(value);
+
+        if (bstLevel5NextValue == 5)
+        {
+            bstLevelSuccess = true;
+            searchResult += ". Degenerate BST completed!";
+        }
+
+        searchInput = "";
+    }
+}
+
+VisualNode* Game::findClickedNode(VisualNode* node, Vector2i mousePosition)
+{
+    if (node == nullptr)
+        return nullptr;
+
+    float dx = node->position.x - mousePosition.x;
+    float dy = node->position.y - mousePosition.y;
+
+    // Check whether the mouse clicked this node.
+    if (dx * dx + dy * dy <= 25.f * 25.f)
+        return node;
+
+    // Search the left subtree.
+    VisualNode* found = findClickedNode(node->left, mousePosition);
+
+    if (found != nullptr)
+        return found;
+
+    // Search the right subtree.
+    return findClickedNode(node->right, mousePosition);
 }
