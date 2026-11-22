@@ -683,206 +683,340 @@ void Game::handleMouseClick(Vector2i mousePosition)
                 }
             }
 
-            // BACK BUTTON
+            // BACK
             else if (isMouseOver(mousePosition, { 30.f, 620.f }, { 150.f, 50.f }))
             {
-                heapInputActive = false;
                 currentScreen = LEVEL_INTRO;
             }
 
-            // LEVEL 1 - BUILD MAX HEAP
-            else if (selectedLevel == 1 &&
-                isMouseOver(mousePosition, { 760.f, 230.f }, { 200.f, 40.f }))
-            {
-                saveHeapState();
-
-                maxHeap.buildMaxHeap();
-                rebuildHeapVisualTree();
-
-                heapLevelSuccess = maxHeap.isMaxHeap();
-
-                if (heapLevelSuccess)
-                {
-                    heapResult = "Max Heap built successfully!";
-                }
-                else
-                {
-                    heapResult = "Heap property is not satisfied.";
-                }
-
-                addHeapEvent("HEAP_BUILD");
-            }
-
-            // LEVEL 2 - HEAPIFY
-            else if (selectedLevel == 2 &&
-                isMouseOver(mousePosition, { 760.f, 230.f }, { 200.f, 40.f }))
-            {
-                saveHeapState();
-
-                maxHeap.buildMaxHeap();
-                rebuildHeapVisualTree();
-
-                heapLevelSuccess = maxHeap.isMaxHeap();
-
-                if (heapLevelSuccess)
-                {
-                    heapResult = "Heap repaired successfully!";
-                }
-                else
-                {
-                    heapResult = "Heapify did not repair the heap.";
-                }
-
-                addHeapEvent("HEAPIFY_DONE");
-            }
-
-            // LEVEL 3 AND 4 - EXTRACT MAXIMUM
+            // REMOVE LAST AFTER ROOT-LAST SWAP
             else if ((selectedLevel == 3 || selectedLevel == 4) &&
+                heapAwaitingRemove &&
                 isMouseOver(mousePosition, { 760.f, 230.f }, { 200.f, 40.f }))
             {
-                if (maxHeap.getSize() > 0 && !heapLevelSuccess)
+                saveHeapState();
+
+                int removedValue;
+
+                if (maxHeap.removeLast(&removedValue))
                 {
-                    int maximum;
+                    heapExtractedValues[heapExtractedCount] = removedValue;
+                    heapExtractedCount++;
+                    heapSteps++;
 
-                    saveHeapState();
+                    heapAwaitingRemove = false;
+                    heapNeedsHeapify = !maxHeap.isMaxHeap();
 
-                    if (maxHeap.extractMax(&maximum))
+                    rebuildHeapVisualTree();
+
+                    heapResult = "Maximum moved out of the heap!";
+                    addHeapEvent("EXTRACT_MAX");
+
+                    if (maxHeap.getSize() == 0)
                     {
-                        heapExtractedValues[heapExtractedCount] = maximum;
-                        heapExtractedCount++;
-
-                        heapSteps++;
-
-                        rebuildHeapVisualTree();
-
-                        heapResult = "Extracted maximum: " + to_string(maximum);
-
-                        addHeapEvent("EXTRACT_MAX");
-                        addHeapEvent("HEAPIFY_DONE");
-
-                        // Level 3: extract every element
-                        if (selectedLevel == 3 && maxHeap.getSize() == 0)
+                        if (selectedLevel == 3 ||
+                            (selectedLevel == 4 && heapSteps <= heapAlarmLimit))
                         {
                             heapLevelSuccess = true;
-                            heapResult = "All maximum values extracted!";
-                        }
-
-                        // Level 4: finish before the alarm limit
-                        else if (selectedLevel == 4)
-                        {
-                            if (maxHeap.getSize() == 0 &&
-                                heapSteps <= heapAlarmLimit)
-                            {
-                                heapLevelSuccess = true;
-                                heapResult = "Vault cleared before the alarm!";
-                            }
-                            else if (heapSteps >= heapAlarmLimit)
-                            {
-                                heapResult = "Alarm limit reached! Reset the level.";
-                            }
+                            heapResult = "All maxima extracted!";
                         }
                     }
-                }
-                else if (maxHeap.getSize() == 0)
-                {
-                    heapResult = "The heap is already empty!";
+                    else if (selectedLevel == 4 && heapSteps >= heapAlarmLimit)
+                    {
+                        heapResult = "Alarm limit reached! Reset the level.";
+                    }
                 }
             }
 
-            // LEVEL 5 - HEAP SORT
+            // REMOVE LAST DURING HEAP SORT
             else if (selectedLevel == 5 &&
+                heapAwaitingRemove &&
                 isMouseOver(mousePosition, { 760.f, 230.f }, { 200.f, 40.f }))
             {
                 saveHeapState();
 
-                maxHeap.heapSort();
-                rebuildHeapVisualTree();
+                int removedValue;
 
-                bool sorted = true;
-
-                for (int i = 0; i < maxHeap.getSize() - 1; i++)
+                if (maxHeap.removeLast(&removedValue))
                 {
-                    int currentValue;
-                    int nextValue;
+                    heapExtractedValues[heapExtractedCount] = removedValue;
+                    heapExtractedCount++;
 
-                    maxHeap.getValueAt(i, &currentValue);
-                    maxHeap.getValueAt(i + 1, &nextValue);
+                    heapAwaitingRemove = false;
+                    heapNeedsHeapify = !maxHeap.isMaxHeap();
 
-                    if (currentValue > nextValue)
+                    rebuildHeapVisualTree();
+
+                    heapResult = "Maximum moved to sorted section!";
+                    addHeapEvent("SORTED_ELEMENT");
+
+                    if (maxHeap.getSize() == 0)
                     {
-                        sorted = false;
-                        break;
+                        heapLevelSuccess = true;
+                        heapResult = "Heap Sort completed!";
                     }
-                }
-
-                heapLevelSuccess = sorted;
-
-                if (sorted)
-                {
-                    heapResult = "Heap Sort completed! Array is sorted.";
-                    addHeapEvent("HEAP_SORT_COMPLETE");
-                }
-                else
-                {
-                    heapResult = "Array is not sorted correctly.";
                 }
             }
 
             // UNDO
-            else if (isMouseOver(mousePosition, { 760.f, 280.f }, { 95.f, 40.f }))
+            else if (isMouseOver(mousePosition, { 760.f, 310.f }, { 95.f, 40.f }))
             {
                 undoHeapOperation();
                 addHeapEvent("UNDO");
             }
 
             // REPLAY
-            else if (isMouseOver(mousePosition, { 865.f, 280.f }, { 95.f, 40.f }))
+            else if (isMouseOver(mousePosition, { 865.f, 310.f }, { 95.f, 40.f }))
             {
                 replayHeapLevel();
                 addHeapEvent("REPLAY");
             }
 
-            // RESET LEVEL
+            // RESET
             else if (isMouseOver(mousePosition, { 760.f, 535.f }, { 200.f, 40.f }))
             {
                 loadHeapLevel();
             }
 
-            // SELECT AN ARRAY ELEMENT
+            // ARRAY SELECTION AND MANUAL SWAPPING
             else
             {
+                if (heapLevelSuccess || heapAwaitingRemove)
+                {
+                    return;
+                }
+
                 int totalElements = maxHeap.getSize();
 
-                if (totalElements > 0)
+                if (totalElements <= 0)
                 {
-                    float cellWidth = 70.f;
-                    float gap = 10.f;
+                    return;
+                }
 
-                    float totalWidth = totalElements * cellWidth +
-                        (totalElements - 1) * gap;
+                float cellWidth = 70.f;
+                float gap = 10.f;
 
-                    float startX = (window.getSize().x - totalWidth) / 2.f;
+                float totalWidth = totalElements * cellWidth +
+                    (totalElements - 1) * gap;
 
-                    selectedHeapIndex = -1;
+                float startX = (window.getSize().x - totalWidth) / 2.f;
 
-                    for (int i = 0; i < totalElements; i++)
+                int clickedIndex = -1;
+
+                for (int i = 0; i < totalElements; i++)
+                {
+                    float x = startX + i * (cellWidth + gap);
+
+                    if (isMouseOver(mousePosition,
+                        { x, 505.f }, { cellWidth, 55.f }))
                     {
-                        float x = startX + i * (cellWidth + gap);
+                        clickedIndex = i;
+                        break;
+                    }
+                }
 
-                        if (isMouseOver(mousePosition,
-                            { x, 505.f }, { cellWidth, 55.f }))
+                if (clickedIndex == -1)
+                {
+                    heapFirstSelected = -1;
+                    selectedHeapIndex = -1;
+                    clearHighlights(heapVisualRoot);
+                    return;
+                }
+
+                // FINAL ELEMENT: EXTRACT IT WITH ONE CLICK
+                if (totalElements == 1 &&
+                    clickedIndex == 0 &&
+                    (selectedLevel == 3 ||
+                        selectedLevel == 4 ||
+                        selectedLevel == 5))
+                {
+                    saveHeapState();
+
+                    int removedValue;
+
+                    if (maxHeap.removeLast(&removedValue))
+                    {
+                        heapExtractedValues[heapExtractedCount] = removedValue;
+                        heapExtractedCount++;
+
+                        if (selectedLevel == 3 || selectedLevel == 4)
                         {
-                            selectedHeapIndex = i;
-                            break;
+                            heapSteps++;
+                        }
+
+                        heapLevelSuccess = true;
+                        heapAwaitingRemove = false;
+                        heapNeedsHeapify = false;
+                        heapFirstSelected = -1;
+                        selectedHeapIndex = -1;
+
+                        rebuildHeapVisualTree();
+
+                        if (selectedLevel == 5)
+                        {
+                            heapResult = "Heap Sort completed!";
+                            addHeapEvent("SORTED_ELEMENT");
+                        }
+                        else
+                        {
+                            heapResult = "All maxima extracted!";
+                            addHeapEvent("EXTRACT_MAX");
                         }
                     }
 
-                    clearHighlights(heapVisualRoot);
+                    return;
+                }
 
-                    if (selectedHeapIndex != -1)
+                // FIRST SELECTION
+                if (heapFirstSelected == -1)
+                {
+                    heapFirstSelected = clickedIndex;
+                    selectedHeapIndex = clickedIndex;
+
+                    clearHighlights(heapVisualRoot);
+                    highlightHeapNode(heapVisualRoot, clickedIndex);
+
+                    heapResult = "Select the second position.";
+                    return;
+                }
+
+                // SECOND SELECTION
+                int first = heapFirstSelected;
+                int second = clickedIndex;
+
+                heapFirstSelected = -1;
+                selectedHeapIndex = -1;
+
+                clearHighlights(heapVisualRoot);
+
+                if (first == second)
+                {
+                    heapResult = "Choose two different positions.";
+                    return;
+                }
+
+                // LEVEL 1 AND 2: BUILD OR REPAIR THROUGH SWAPS
+                if (selectedLevel == 1 || selectedLevel == 2)
+                {
+                    saveHeapState();
+
+                    maxHeap.swapElements(first, second);
+                    rebuildHeapVisualTree();
+
+                    if (maxHeap.isMaxHeap())
                     {
-                        highlightHeapNode(heapVisualRoot, selectedHeapIndex);
+                        heapLevelSuccess = true;
+                        heapResult = "Correct! Max Heap property satisfied.";
                     }
+                    else
+                    {
+                        heapResult = "Swap completed. Keep repairing the heap.";
+                    }
+
+                    addHeapEvent("MANUAL_SWAP");
+                }
+
+                // LEVEL 5: BUILD THE INITIAL MAX HEAP MANUALLY
+                else if (selectedLevel == 5 && heapSortBuilding)
+                {
+                    saveHeapState();
+
+                    maxHeap.swapElements(first, second);
+                    rebuildHeapVisualTree();
+
+                    if (maxHeap.isMaxHeap())
+                    {
+                        heapSortBuilding = false;
+                        heapResult = "Max Heap built! Start Heap Sort.";
+                    }
+                    else
+                    {
+                        heapResult = "Swap completed. Continue building the heap.";
+                    }
+
+                    addHeapEvent("MANUAL_SWAP");
+                }
+
+                // LEVEL 3, 4 AND 5: MANUAL HEAPIFY
+                else if (heapNeedsHeapify)
+                {
+                    int parent = (first < second) ? first : second;
+                    int child = (first > second) ? first : second;
+
+                    if (child != 2 * parent + 1 &&
+                        child != 2 * parent + 2)
+                    {
+                        heapResult = "Select a parent and its child.";
+                        return;
+                    }
+
+                    int parentValue;
+                    int childValue;
+
+                    maxHeap.getValueAt(parent, &parentValue);
+                    maxHeap.getValueAt(child, &childValue);
+
+                    if (childValue <= parentValue)
+                    {
+                        heapResult = "The child must be larger than its parent.";
+                        return;
+                    }
+
+                    int sibling = (child == 2 * parent + 1)
+                        ? child + 1 : child - 1;
+
+                    if (sibling < totalElements)
+                    {
+                        int siblingValue;
+                        maxHeap.getValueAt(sibling, &siblingValue);
+
+                        if (siblingValue > childValue)
+                        {
+                            heapResult = "Choose the larger child.";
+                            return;
+                        }
+                    }
+
+                    saveHeapState();
+
+                    maxHeap.swapElements(parent, child);
+                    rebuildHeapVisualTree();
+
+                    if (maxHeap.isMaxHeap())
+                    {
+                        heapNeedsHeapify = false;
+                        heapResult = "Heap repaired! Extract the next maximum.";
+                    }
+                    else
+                    {
+                        heapResult = "Good swap. Continue repairing the heap.";
+                    }
+
+                    addHeapEvent("HEAPIFY_SWAP");
+                }
+
+                // LEVEL 3, 4 AND 5: SWAP ROOT WITH LAST
+                else
+                {
+                    int last = totalElements - 1;
+
+                    if (!((first == 0 && second == last) ||
+                        (first == last && second == 0)))
+                    {
+                        heapResult = "Select the ROOT and LAST position.";
+                        return;
+                    }
+
+                    saveHeapState();
+
+                    maxHeap.swapElements(0, last);
+
+                    heapAwaitingRemove = true;
+
+                    rebuildHeapVisualTree();
+
+                    heapResult = "Correct! Now remove the last position.";
+                    addHeapEvent("ROOT_LAST_SWAP");
                 }
             }
         }
@@ -2758,17 +2892,17 @@ void Game::drawHeapGameplay()
     if (selectedLevel == 1)
     {
         drawText("Build a Max Heap", { 40.f, 160.f }, 16);
-        drawText("from the given array.", { 40.f, 185.f }, 16);
+        drawText("by swapping values.", { 40.f, 185.f }, 16);
     }
     else if (selectedLevel == 2)
     {
         drawText("Repair the disturbed", { 40.f, 160.f }, 16);
-        drawText("heap using heapify.", { 40.f, 185.f }, 16);
+        drawText("heap using swaps.", { 40.f, 185.f }, 16);
     }
     else if (selectedLevel == 3)
     {
-        drawText("Extract the maximum", { 40.f, 160.f }, 16);
-        drawText("until the heap is empty.", { 40.f, 185.f }, 16);
+        drawText("Extract each maximum", { 40.f, 160.f }, 16);
+        drawText("manually and repair.", { 40.f, 185.f }, 16);
     }
     else if (selectedLevel == 4)
     {
@@ -2779,8 +2913,8 @@ void Game::drawHeapGameplay()
     }
     else if (selectedLevel == 5)
     {
-        drawText("Sort the complete", { 40.f, 160.f }, 16);
-        drawText("array using Heap Sort.", { 40.f, 185.f }, 16);
+        drawText("Build a heap, then", { 40.f, 160.f }, 16);
+        drawText("perform Heap Sort.", { 40.f, 185.f }, 16);
     }
 
     // Tree visualization
@@ -2792,7 +2926,7 @@ void Game::drawHeapGameplay()
     // Active heap array
     drawHeapArray();
 
-    // Extracted values
+    // Extracted values / sorted values
     if (selectedLevel == 3 || selectedLevel == 4)
     {
         string extractedText = "EXTRACTED MAXIMA: ";
@@ -2802,7 +2936,18 @@ void Game::drawHeapGameplay()
             extractedText += to_string(heapExtractedValues[i]) + " ";
         }
 
-        drawText(extractedText, { 250.f, 575.f }, 17);
+        drawText(extractedText, { 250.f, 575.f }, 16);
+    }
+    else if (selectedLevel == 5)
+    {
+        string sortedText = "SORTED: ";
+
+        for (int i = heapExtractedCount - 1; i >= 0; i--)
+        {
+            sortedText += to_string(heapExtractedValues[i]) + " ";
+        }
+
+        drawText(sortedText, { 250.f, 575.f }, 16);
     }
 
     drawHeapOperations();
@@ -2838,33 +2983,60 @@ void Game::highlightHeapNode(VisualNode* node, int targetIndex, int currentIndex
 
 void Game::drawHeapOperations()
 {
-    drawText("Heap Operations", { 760.f, 180.f }, 24);
+    drawText("PLAYER ACTIONS", { 760.f, 180.f }, 22);
 
-    if (selectedLevel == 1)
+    if (selectedLevel == 1 || selectedLevel == 2)
     {
-        drawButton("Build Max Heap",
-            { 760.f, 230.f }, { 200.f, 40.f });
-    }
-    else if (selectedLevel == 2)
-    {
-        drawButton("Heapify",
-            { 760.f, 230.f }, { 200.f, 40.f });
+        drawText("Select two array", { 760.f, 225.f }, 14);
+        drawText("positions to swap.", { 760.f, 245.f }, 14);
     }
     else if (selectedLevel == 3 || selectedLevel == 4)
     {
-        drawButton("Extract Maximum",
-            { 760.f, 230.f }, { 200.f, 40.f });
+        if (heapAwaitingRemove)
+        {
+            drawButton("REMOVE LAST",
+                { 760.f, 230.f }, { 200.f, 40.f });
+        }
+        else if (heapNeedsHeapify)
+        {
+            drawText("Select a parent and", { 760.f, 225.f }, 14);
+            drawText("its larger child.", { 760.f, 245.f }, 14);
+        }
+        else
+        {
+            drawText("Select ROOT and", { 760.f, 225.f }, 14);
+            drawText("LAST array position.", { 760.f, 245.f }, 14);
+        }
     }
     else if (selectedLevel == 5)
     {
-        drawButton("Heap Sort",
-            { 760.f, 230.f }, { 200.f, 40.f });
+        if (heapAwaitingRemove)
+        {
+            drawButton("MOVE MAX TO SORTED",
+                { 760.f, 230.f }, { 200.f, 40.f });
+        }
+        else if (heapNeedsHeapify)
+        {
+            drawText("Repair the heap:", { 760.f, 225.f }, 14);
+            drawText("swap parent with", { 760.f, 245.f }, 14);
+            drawText("its larger child.", { 760.f, 265.f }, 14);
+        }
+        else if (heapSortBuilding)
+        {
+            drawText("Build a Max Heap", { 760.f, 225.f }, 14);
+            drawText("by swapping values.", { 760.f, 245.f }, 14);
+        }
+        else
+        {
+            drawText("Select ROOT and", { 760.f, 225.f }, 14);
+            drawText("LAST array position.", { 760.f, 245.f }, 14);
+        }
     }
 
-    drawButton("Undo", { 760.f, 280.f }, { 95.f, 40.f });
-    drawButton("Replay", { 865.f, 280.f }, { 95.f, 40.f });
+    drawButton("Undo", { 760.f, 310.f }, { 95.f, 40.f });
+    drawButton("Replay", { 865.f, 310.f }, { 95.f, 40.f });
 
-    drawText(heapResult, { 760.f, 350.f }, 16);
+    drawText(heapResult, { 760.f, 380.f }, 15);
 
     drawButton("Reset Level",
         { 760.f, 535.f }, { 200.f, 40.f });
@@ -2877,10 +3049,15 @@ void Game::loadHeapLevel()
     heapSteps = 0;
     selectedHeapIndex = -1;
 
+    heapFirstSelected = -1;
+    heapAwaitingRemove = false;
+    heapNeedsHeapify = false;
+    heapSortBuilding = (selectedLevel == 5);
+
     if (selectedLevel == 1)
     {
         // Unordered array: build a Max Heap
-        int values[] = { 10, 40, 30, 5, 20, 15 };
+        int values[] = { 20, 45, 35, 10, 15, 30 };
         maxHeap.loadArray(values, 6);
 
         heapAlarmLimit = 8;
@@ -2945,6 +3122,10 @@ void Game::saveHeapState()
     previousHeapSteps = heapSteps;
     previousHeapLevelSuccess = heapLevelSuccess;
 
+    previousHeapAwaitingRemove = heapAwaitingRemove;
+    previousHeapNeedsHeapify = heapNeedsHeapify;
+    previousHeapSortBuilding = heapSortBuilding;
+
     canUndo = true;
 }
 
@@ -2961,6 +3142,12 @@ void Game::undoHeapOperation()
     heapExtractedCount = previousHeapExtractedCount;
     heapSteps = previousHeapSteps;
     heapLevelSuccess = previousHeapLevelSuccess;
+
+    heapAwaitingRemove = previousHeapAwaitingRemove;
+    heapNeedsHeapify = previousHeapNeedsHeapify;
+    heapSortBuilding = previousHeapSortBuilding;
+
+    heapFirstSelected = -1;
 
     rebuildHeapVisualTree();
 

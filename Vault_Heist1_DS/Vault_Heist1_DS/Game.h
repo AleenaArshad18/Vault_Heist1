@@ -221,6 +221,16 @@ private:
     VisualNode* heapVisualRoot = nullptr;
     int selectedHeapIndex = -1;
 
+    int heapFirstSelected = -1;
+
+    bool heapAwaitingRemove = false;
+    bool heapNeedsHeapify = false;
+    bool heapSortBuilding = false;
+
+    bool previousHeapAwaitingRemove = false;
+    bool previousHeapNeedsHeapify = false;
+    bool previousHeapSortBuilding = false;
+
     bool heapLevelSuccess = false;
     int heapExtractedValues[20] = {};
     int heapExtractedCount = 0;
