@@ -339,10 +339,31 @@ void Game::processEvents()
         {
             if (const auto* key = event->getIf<Event::KeyPressed>())
             {
-                // ENTER KEY
+                if (selectedAct == 4)
+                {
+                    if (key->code == Keyboard::Key::Space)
+                    {
+                        animationController.togglePlayPause();
+                    }
+                    else if (key->code == Keyboard::Key::Right)
+                    {
+                        animationController.stepForward();
+                    }
+                    else if (key->code == Keyboard::Key::Equal)
+                    {
+                        animationController.setSpeed(
+                            animationController.getSpeed() + 0.25f);
+                    }
+                    else if (key->code == Keyboard::Key::Hyphen)
+                    {
+                        animationController.setSpeed(
+                            animationController.getSpeed() - 0.25f);
+                    }
+                }
+
+                // Existing BST search control
                 if (key->code == Keyboard::Key::Enter)
                 {
-                    // Level 1 - Start BST Search
                     if (selectedAct == 2 &&
                         selectedLevel == 1 &&
                         searchInputActive)
@@ -356,12 +377,14 @@ void Game::processEvents()
     }
 }
 
-
-
-// Update function
 void Game::update()
 {
-    // Future game updates will be handled here.
+    float deltaTime = animationClock.restart().asSeconds();
+
+    if (currentScreen == GAMEPLAY && selectedAct == 4)
+    {
+        animationController.update(deltaTime);
+    }
 }
 
 
@@ -3228,6 +3251,8 @@ void Game::addHeapEvent(string event)
 
         heapEvents[5] = event;
     }
+
+    animationController.setEvents(heapEvents, heapEventCount);
 }
 
 void Game::drawHeapEventLog()
@@ -3241,6 +3266,35 @@ void Game::drawHeapEventLog()
         drawText(heapEvents[i],
             { 265.f + i * 78.f, 648.f }, 11);
     }
+
+    string playbackStatus = "PAUSED";
+
+    if (animationController.isPlaying())
+    {
+        playbackStatus = "PLAYING";
+    }
+    else if (animationController.isFinished())
+    {
+        playbackStatus = "FINISHED";
+    }
+
+    drawText(
+        playbackStatus +
+        " | SPEED: " +
+        to_string(animationController.getSpeed()) +
+        "x",
+        { 760.f, 615.f },
+        13);
+
+    drawText(
+        "SPACE: PLAY/PAUSE | RIGHT: STEP | +/-: SPEED",
+        { 760.f, 640.f },
+        10);
+
+    drawText(
+        "CURRENT: " + animationController.getCurrentEvent(),
+        { 760.f, 660.f },
+        10);
 }
 
 // ACT 1 - BINARY TREE GAMEPLAY

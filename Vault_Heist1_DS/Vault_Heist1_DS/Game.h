@@ -8,6 +8,8 @@
 #include "Renderer.h"
 #include "BST.h"
 #include "MaxHeap.h"
+#include "AnimationController.h"
+
 using namespace sf;
 using namespace std;
 class Game
@@ -200,6 +202,8 @@ private:
     void clearHighlights(VisualNode* node);
     void highlightNode(VisualNode* node, int value);
     RenderWindow window;
+    AnimationController animationController;
+    Clock animationClock;
     LayoutEngine layoutEngine;
     Renderer renderer;
     Font uiFont;
