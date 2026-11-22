@@ -30,6 +30,7 @@ private:
     static const int LEADERBOARD = 6;
     static const int RESULT_SCREEN = 7;
 
+    //ACT 1
     bool binaryLevelSuccess = false;
     bool binaryHeightShown = false;
     bool binaryDiameterShown = false;
@@ -37,6 +38,111 @@ private:
     bool binaryPathShown = false;
     bool binaryMirrorDone = false;
     bool binarySymmetryChecked = false;
+
+    //ACT 2
+    // ACT 2 - BST LEVEL 1 SEARCH
+    bool bstLevelSuccess = false;
+    bool bstSearchStarted = false;
+
+    int bstSearchTarget = -1;
+    int bstComparisons = 0;
+
+    // Level 3 - deletion progress
+    bool bstLeafDeleted = false;
+    bool bstOneChildDeleted = false;
+    bool bstTwoChildrenDeleted = false;
+
+    // ACT 2 - LEVEL 3: DELETE INTERACTION
+    VisualNode* findClickedNode(VisualNode* node, Vector2i mousePosition);
+    VisualNode* bstDeleteSelectedNode = nullptr;
+
+    int bstDeleteCaseSelected = 0;
+    // 0 = no case selected
+    // 1 = leaf
+    // 2 = one child
+    // 3 = two children
+
+    bool bstDeleteAwaitingConfirmation = false;
+
+    int bstDeleteSuccessor = -1;
+
+    // Level 5 - sorted insertion progress
+    int bstLevel5NextValue = 0;
+    int bstLevel5Values[5] = { 10, 20, 30, 40, 50 };
+
+    string rangeLowInput = "";
+    string rangeHighInput = "";
+
+    bool rangeLowInputActive = false;
+    bool rangeHighInputActive = false;
+
+    // ACT 2 - LEVEL 4: RANGE RAID
+
+    int rangeLow = 0;
+    int rangeHigh = 0;
+
+    bool rangeQueryStarted = false;
+    bool rangeQueryFinished = false;
+
+    Node* rangeCurrentNode = nullptr;
+
+    // Fixed-size stack for BST traversal
+    Node* rangeStack[100];
+    int rangeStackTop = -1;
+
+    // Range query results
+    int rangeResults[100];
+    int rangeResultCount = 0;
+
+    // Statistics
+    int rangeNodesVisited = 0;
+    int rangeSubtreesPruned = 0;
+    int rangeCorrectDecisions = 0;
+    int rangeWrongDecisions = 0;
+
+    // Current decision:
+    // 1 = node smaller than lower limit
+    // 2 = node greater than upper limit
+    // 3 = node inside range
+    int rangeDecisionType = 0;
+
+    Node* bstCurrentNode = nullptr;
+
+    int bstSearchPath[100];
+    int bstSearchPathLength = 0;
+
+    // ACT 2 - LEVEL 2: INTERACTIVE INSERTION
+
+    Node* bstInsertCurrentNode = nullptr;
+    Node* bstInsertParentNode = nullptr;
+
+    int bstInsertValue = -1;
+    int bstInsertComparisons = 0;
+
+    bool bstInsertStarted = false;
+    bool bstInsertReadyToInsert = false;
+    bool bstInsertLeft = false;
+
+    void startBSTInsertion();
+    void moveBSTInsertLeft();
+    void moveBSTInsertRight();
+    void confirmBSTInsertion();
+    void resetBSTInsertion();
+
+    // Act 2 - BST level drawing
+    void drawBSTLevel1();
+    void drawBSTLevel2();
+    void drawBSTLevel3();
+    void drawBSTLevel4();
+    void drawBSTLevel5();
+
+    // Act 2 - BST level click handlers
+    void handleBSTLevel1Click(Vector2i mousePosition);
+    void handleBSTLevel2Click(Vector2i mousePosition);
+    void handleBSTLevel3Click(Vector2i mousePosition);
+    void handleBSTLevel4Click(Vector2i mousePosition);
+    void handleBSTLevel5Click(Vector2i mousePosition);
+
 
     void processEvents();
    
@@ -97,6 +203,11 @@ private:
     void performMaximum();
     void performSuccessor();
     void performPredecessor();
+
+    void startBSTSearch();
+    void moveBSTLeft();
+    void moveBSTRight();
+    void performRangeQuery();
 
     // AVL operations
     void performAVLInsert();
@@ -181,4 +292,10 @@ private:
 
     bool levelCompleted[4][5] = {};
 
+
+    void startRangeRaid();
+    void prepareNextRangeNode();
+    void handleRangeDecision(int decision);
+    void finishRangeRaid();
+    void resetRangeRaid();
 };
