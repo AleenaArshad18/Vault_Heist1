@@ -1,0 +1,181 @@
+#pragma once
+
+#include <SFML/Graphics.hpp>
+#include <string>
+#include "BinaryTree.h"
+#include "AVLTree.h"
+#include "VisualNode.h"
+#include "LayoutEngine.h"
+#include "Renderer.h"
+#include "BST.h"
+#include "MaxHeap.h"
+
+using namespace sf;
+using namespace std;
+
+class Game
+{
+public:
+    Game();
+    void run();
+    ~Game();
+
+private:
+    static const int MAIN_MENU = 0;
+    static const int CAMPAIGN_MAP = 1;
+    static const int LEVEL_SELECT = 2;
+    static const int LEVEL_INTRO = 3;
+    static const int GAMEPLAY = 4;
+    static const int SANDBOX = 5;
+    static const int LEADERBOARD = 6;
+    static const int RESULT_SCREEN = 7;
+
+    bool binaryLevelSuccess = false;
+    bool binaryHeightShown = false;
+    bool binaryDiameterShown = false;
+    bool binaryLcaShown = false;
+    bool binaryPathShown = false;
+    bool binaryMirrorDone = false;
+    bool binarySymmetryChecked = false;
+
+    void processEvents();
+    void update();
+    void render();
+    void handleMouseClick(Vector2i mousePosition);
+    bool isMouseOver(Vector2i mousePosition, Vector2f position, Vector2f size);
+
+    void drawMainMenu();
+    void drawCampaignMap();
+    void drawLevelSelect();
+    void drawLevelIntro();
+    void drawGameplay();
+    void drawPlaceholder(const std::string& title, const std::string& message);
+    void drawBinaryGameplay();
+    void drawAVLGameplay();
+
+    // Sandbox
+    void drawSandbox();
+    void handleSandboxClick(Vector2i mousePosition);
+    void resetSandboxStructure();
+    void rebuildSandboxVisualTree();
+
+    void drawButton(const std::string& text, Vector2f position, Vector2f size, bool enabled = true);
+    void drawCenteredText(const std::string& text, float y, unsigned int fontSize);
+    void drawText(const std::string& text, Vector2f position, unsigned int fontSize);
+    void drawPanel(Vector2f position, Vector2f size);
+
+    void drawHeapGameplay();
+    void drawHeapArray();
+    void drawHeapOperations();
+
+    void drawResultScreen();
+    void completeCurrentLevel();
+    void handleResultClick(Vector2i mousePosition);
+
+    void positionGameplayTree();
+    void shiftTree(VisualNode* node, float offsetX);
+
+    // BST and visual tree connection
+    VisualNode* convertToVisualTree(Node* node);
+    void rebuildVisualTree();
+    void deleteVisualTree(VisualNode* node);
+
+    VisualNode* convertHeapToVisualTree(int index);
+    void rebuildHeapVisualTree();
+    void deleteHeapVisualTree(VisualNode* node);
+
+    // Binary Tree visual connection
+    VisualNode* convertBinaryToVisualTree(Node* node);
+    void rebuildBinaryVisualTree();
+
+    // AVL Tree visual connection
+    VisualNode* convertAVLToVisualTree(AVLNode* node);
+    void rebuildAVLVisualTree();
+
+    // Search functionality
+    void performSearch();
+    void performInsert();
+    void performDelete();
+    void performMinimum();
+    void performMaximum();
+    void performSuccessor();
+    void performPredecessor();
+
+    // AVL operations
+    void performAVLInsert();
+    void performAVLDelete();
+
+    void clearHighlights(VisualNode* node);
+    void highlightNode(VisualNode* node, int value);
+
+    RenderWindow window;
+    LayoutEngine layoutEngine;
+    Renderer renderer;
+    Font uiFont;
+    bool uiFontLoaded = false;
+
+    int currentScreen = MAIN_MENU;
+    int selectedLevel = 0;
+    int selectedAct = 2;
+
+    // Sandbox state: 0 means structure-selection screen; 1-4 select the acts.
+    int sandboxAct = 0;
+    string sandboxInput = "";
+    string sandboxResult = "";
+    bool sandboxInputActive = false;
+    bool sandboxInitialized[4] = { false, false, false, false };
+
+    BST sandboxBST;
+    BinaryTree sandboxBinaryTree;
+    AVLTree sandboxAVLTree;
+    MaxHeap sandboxMaxHeap;
+    VisualNode* sandboxVisualRoot = nullptr;
+
+    BST bst;
+    VisualNode* visualRoot = nullptr;
+
+    BinaryTree binaryTree;
+    VisualNode* binaryVisualRoot = nullptr;
+    string binaryTraversalResult = "";
+
+    AVLTree avlTree;
+    VisualNode* avlVisualRoot = nullptr;
+
+    string searchInput = "";
+    string searchResult = "";
+    bool searchInputActive = false;
+
+    MaxHeap maxHeap;
+    VisualNode* heapVisualRoot = nullptr;
+    int selectedHeapIndex = -1;
+
+    void highlightHeapNode(VisualNode* node, int targetIndex, int currentIndex = 0);
+    void loadHeapLevel();
+
+    string heapInput = "";
+    string heapResult = "";
+    bool heapInputActive = false;
+
+    int* previousHeapState = nullptr;
+    int previousHeapSize = 0;
+    bool canUndo = false;
+
+    void saveHeapState();
+    void undoHeapOperation();
+    void replayHeapLevel();
+
+    string heapEvents[6];
+    int heapEventCount = 0;
+    void addHeapEvent(string event);
+    void drawHeapEventLog();
+
+    bool actUnlocked[4] = { true, false, false, false };
+    bool levelUnlocked[4][5] =
+    {
+        { true, false, false, false, false },
+        { false, false, false, false, false },
+        { false, false, false, false, false },
+        { false, false, false, false, false }
+    };
+    bool levelCompleted[4][5] = {};
+};

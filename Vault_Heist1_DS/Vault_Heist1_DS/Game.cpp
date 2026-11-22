@@ -6,9 +6,7 @@
 #include <functional>
 using namespace sf;
 using namespace std;
-
 //comment
-
 namespace
 {
     string getBinaryTraversal(Node* root, int order)
@@ -53,10 +51,6 @@ namespace
         return result;
     }
 }
-
-
-
-
 // Constructor
 Game::Game() : maxHeap(10)
 {
@@ -111,7 +105,6 @@ Game::Game() : maxHeap(10)
 
     positionGameplayTree();;
 }
-
 
 // Main game loop
 void Game::run()

@@ -149,6 +149,7 @@
     <ClCompile Include="BinaryTree.cpp" />
     <ClCompile Include="BST.cpp" />
     <ClCompile Include="Game.cpp" />
+    <ClCompile Include="GameSandBox.cpp" />
     <ClCompile Include="LayoutEngine.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MaxHeap.cpp" />
@@ -160,6 +161,7 @@
     <ClInclude Include="BinaryTree.h" />
     <ClInclude Include="BST.h" />
     <ClInclude Include="Game.h" />
+    <ClInclude Include="GameSandBox.h" />
     <ClInclude Include="LayoutEngine.h" />
     <ClInclude Include="MaxHeap.h" />
     <ClInclude Include="Renderer.h" />
