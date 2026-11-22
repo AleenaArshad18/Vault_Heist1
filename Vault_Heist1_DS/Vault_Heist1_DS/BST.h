@@ -11,7 +11,7 @@ struct Node {
 		left = nullptr;
 	}
 };
-
+//comment
 class BST {
 	Node* root;
 
