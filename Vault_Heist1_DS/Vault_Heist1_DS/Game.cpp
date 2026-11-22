@@ -691,8 +691,10 @@ void Game::handleMouseClick(Vector2i mousePosition)
 
             // REMOVE LAST AFTER ROOT-LAST SWAP
             else if ((selectedLevel == 3 || selectedLevel == 4) &&
+                !heapLevelFailed &&
                 heapAwaitingRemove &&
                 isMouseOver(mousePosition, { 760.f, 230.f }, { 200.f, 40.f }))
+
             {
                 saveHeapState();
 
@@ -700,8 +702,6 @@ void Game::handleMouseClick(Vector2i mousePosition)
 
                 if (maxHeap.removeLast(&removedValue))
                 {
-                    heapExtractedValues[heapExtractedCount] = removedValue;
-                    heapExtractedCount++;
                     heapSteps++;
 
                     heapAwaitingRemove = false;
@@ -709,21 +709,22 @@ void Game::handleMouseClick(Vector2i mousePosition)
 
                     rebuildHeapVisualTree();
 
-                    heapResult = "Maximum moved out of the heap!";
                     addHeapEvent("EXTRACT_MAX");
 
-                    if (maxHeap.getSize() == 0)
+                    if (selectedLevel == 4 && heapSteps > heapAlarmLimit)
                     {
-                        if (selectedLevel == 3 ||
-                            (selectedLevel == 4 && heapSteps <= heapAlarmLimit))
+                        heapLevelFailed = true;
+                        heapResult = "Alarm triggered! Undo, replay, or reset.";
+                    }
+                    else
+                    {
+                        heapResult = "Maximum moved out of the heap!";
+
+                        if (maxHeap.getSize() == 0)
                         {
                             heapLevelSuccess = true;
                             heapResult = "All maxima extracted!";
                         }
-                    }
-                    else if (selectedLevel == 4 && heapSteps >= heapAlarmLimit)
-                    {
-                        heapResult = "Alarm limit reached! Reset the level.";
                     }
                 }
             }
@@ -781,7 +782,7 @@ void Game::handleMouseClick(Vector2i mousePosition)
             // ARRAY SELECTION AND MANUAL SWAPPING
             else
             {
-                if (heapLevelSuccess || heapAwaitingRemove)
+                if (heapLevelSuccess || heapLevelFailed || heapAwaitingRemove)
                 {
                     return;
                 }
@@ -844,7 +845,17 @@ void Game::handleMouseClick(Vector2i mousePosition)
                             heapSteps++;
                         }
 
-                        heapLevelSuccess = true;
+                        if (selectedLevel == 4 && heapSteps > heapAlarmLimit)
+                        {
+                            heapLevelFailed = true;
+                            heapLevelSuccess = false;
+                            heapResult = "Alarm triggered! Undo, replay, or reset.";
+                        }
+                        else
+                        {
+                            heapLevelSuccess = true;
+                        }
+
                         heapAwaitingRemove = false;
                         heapNeedsHeapify = false;
                         heapFirstSelected = -1;
@@ -857,7 +868,7 @@ void Game::handleMouseClick(Vector2i mousePosition)
                             heapResult = "Heap Sort completed!";
                             addHeapEvent("SORTED_ELEMENT");
                         }
-                        else
+                        else if (!heapLevelFailed)
                         {
                             heapResult = "All maxima extracted!";
                             addHeapEvent("EXTRACT_MAX");
@@ -980,9 +991,25 @@ void Game::handleMouseClick(Vector2i mousePosition)
                     saveHeapState();
 
                     maxHeap.swapElements(parent, child);
+
+                    if (selectedLevel == 4)
+                    {
+                        heapSteps++;
+
+                        if (heapSteps > heapAlarmLimit)
+                        {
+                            heapLevelFailed = true;
+                            heapResult = "Alarm triggered! Undo, replay, or reset.";
+                        }
+                    }
+
                     rebuildHeapVisualTree();
 
-                    if (maxHeap.isMaxHeap())
+                    if (heapLevelFailed)
+                    {
+                        // Alarm triggered. Do not continue heap repair.
+                    }
+                    else if (maxHeap.isMaxHeap())
                     {
                         heapNeedsHeapify = false;
                         heapResult = "Heap repaired! Extract the next maximum.";
@@ -1010,6 +1037,17 @@ void Game::handleMouseClick(Vector2i mousePosition)
                     saveHeapState();
 
                     maxHeap.swapElements(0, last);
+
+                    if (selectedLevel == 4)
+                    {
+                        heapSteps++;
+
+                        if (heapSteps > heapAlarmLimit)
+                        {
+                            heapLevelFailed = true;
+                            heapResult = "Alarm triggered! Undo, replay, or reset.";
+                        }
+                    }
 
                     heapAwaitingRemove = true;
 
@@ -3045,6 +3083,7 @@ void Game::drawHeapOperations()
 void Game::loadHeapLevel()
 {
     heapLevelSuccess = false;
+    heapLevelFailed = false;
     heapExtractedCount = 0;
     heapSteps = 0;
     selectedHeapIndex = -1;
@@ -3080,12 +3119,11 @@ void Game::loadHeapLevel()
     }
     else if (selectedLevel == 4)
     {
-        // Larger heap: complete extraction under an operation limit
         int values[] = { 100, 60, 90, 20, 50, 70, 80, 10 };
         maxHeap.loadArray(values, 8);
-
-        heapAlarmLimit = 8;
+        heapAlarmLimit = 25;
     }
+
     else if (selectedLevel == 5)
     {
         // Final independent sorting challenge
@@ -3121,6 +3159,7 @@ void Game::saveHeapState()
     previousHeapExtractedCount = heapExtractedCount;
     previousHeapSteps = heapSteps;
     previousHeapLevelSuccess = heapLevelSuccess;
+    previousHeapLevelFailed = heapLevelFailed;
 
     previousHeapAwaitingRemove = heapAwaitingRemove;
     previousHeapNeedsHeapify = heapNeedsHeapify;
@@ -3142,6 +3181,7 @@ void Game::undoHeapOperation()
     heapExtractedCount = previousHeapExtractedCount;
     heapSteps = previousHeapSteps;
     heapLevelSuccess = previousHeapLevelSuccess;
+    heapLevelFailed = previousHeapLevelFailed;
 
     heapAwaitingRemove = previousHeapAwaitingRemove;
     heapNeedsHeapify = previousHeapNeedsHeapify;

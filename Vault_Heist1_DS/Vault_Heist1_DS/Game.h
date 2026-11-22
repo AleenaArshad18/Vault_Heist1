@@ -232,6 +232,9 @@ private:
     bool previousHeapSortBuilding = false;
 
     bool heapLevelSuccess = false;
+    bool heapLevelFailed = false;
+    bool previousHeapLevelFailed = false;
+
     int heapExtractedValues[20] = {};
     int heapExtractedCount = 0;
     int heapSteps = 0;
