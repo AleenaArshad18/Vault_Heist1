@@ -776,6 +776,7 @@ else if (selectedAct == 2)
             clearHighlights(visualRoot);
         }
     }
+    //comment
 
     // LEVEL 1 - SEARCH HEIST
     else if (selectedLevel == 1)
