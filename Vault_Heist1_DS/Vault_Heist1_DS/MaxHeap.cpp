@@ -217,3 +217,16 @@ bool MaxHeap::getValueAt(int index, int* value)
 
     return true;
 }
+
+bool MaxHeap ::removeLast(int* removedValue)
+{
+    if (size == 0)
+    {
+        return false;
+    }
+
+    *removedValue = heap[size - 1];
+    size--;
+
+    return true;
+}

@@ -220,6 +220,7 @@ private:
     MaxHeap maxHeap;
     VisualNode* heapVisualRoot = nullptr;
     int selectedHeapIndex = -1;
+
     bool heapLevelSuccess = false;
     int heapExtractedValues[20] = {};
     int heapExtractedCount = 0;

@@ -20,6 +20,7 @@ public:
     void buildMaxHeap();
     void insert(int value);
     bool extractMax(int* maxValue);
+    bool removeLast(int* removedValue);
     bool getMax(int* maxValue);
     bool swapElements(int index1, int index2);
     bool isMaxHeap();
