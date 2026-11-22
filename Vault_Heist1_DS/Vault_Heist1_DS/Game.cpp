@@ -1,58 +1,102 @@
 #include "Game.h"
 #include <iostream>
 #include <string>
-#include <queue>
-#include <vector>
-#include <functional>
+#include <fstream>
 using namespace sf;
 using namespace std;
 //comment 2.2
 namespace
 {
+    // Counts nodes so the level-order traversal can use an array queue
+    // sized exactly for the current tree.
+    int countBinaryNodes(Node* node)
+    {
+        if (node == nullptr) return 0;
+        return 1 + countBinaryNodes(node->left) + countBinaryNodes(node->right);
+    }
+
+    // Adds a value to the traversal result using a string.
+    void appendTraversalValue(string& result, int value)
+    {
+        if (!result.empty()) result += " -> ";
+        result += to_string(value);
+    }
+
+    // Recursive preorder, inorder and postorder traversal.
+    void buildDepthTraversal(Node* node, int order, string& result)
+    {
+        if (node == nullptr) return;
+
+        if (order == 0) appendTraversalValue(result, node->data);
+
+        buildDepthTraversal(node->left, order, result);
+
+        if (order == 1) appendTraversalValue(result, node->data);
+
+        buildDepthTraversal(node->right, order, result);
+
+        if (order == 2) appendTraversalValue(result, node->data);
+    }
+
     string getBinaryTraversal(Node* root, int order)
     {
-        vector<int> values;
+        if (root == nullptr) return "Tree is empty.";
+
+        string result;
+
         if (order == 3)
         {
-            if (root)
+            // Array-based queue for level-order traversal.
+            int totalNodes = countBinaryNodes(root);
+            Node** nodes = new Node * [totalNodes];
+
+            int front = 0;
+            int rear = 0;
+
+            nodes[rear++] = root;
+
+            while (front < rear)
             {
-                queue<Node*> nodes;
-                nodes.push(root);
-                while (!nodes.empty())
-                {
-                    Node* current = nodes.front();
-                    nodes.pop();
-                    values.push_back(current->data);
-                    if (current->left) nodes.push(current->left);
-                    if (current->right) nodes.push(current->right);
-                }
+                Node* current = nodes[front++];
+                appendTraversalValue(result, current->data);
+
+                if (current->left != nullptr)
+                    nodes[rear++] = current->left;
+
+                if (current->right != nullptr)
+                    nodes[rear++] = current->right;
             }
+
+            delete[] nodes;
         }
         else
         {
-            function<void(Node*)> visit = [&](Node* node)
-                {
-                    if (!node) return;
-                    if (order == 0) values.push_back(node->data);
-                    visit(node->left);
-                    if (order == 1) values.push_back(node->data);
-                    visit(node->right);
-                    if (order == 2) values.push_back(node->data);
-                };
-            visit(root);
+            buildDepthTraversal(root, order, result);
         }
-        if (values.empty()) return "Tree is empty.";
-        string result;
-        for (size_t i = 0; i < values.size(); ++i)
-        {
-            if (i) result += " -> ";
-            result += to_string(values[i]);
-        }
+
         return result;
     }
+    void appendInorder(Node* node, string& result)
+    {
+        if (!node) return;
+        appendInorder(node->left, result);
+        if (!result.empty()) result += "  ";
+        result += to_string(node->data);
+        appendInorder(node->right, result);
+    }
+
+    void appendAVLInorder(AVLNode* node, string& result)
+    {
+        if (!node) return;
+        appendAVLInorder(node->left, result);
+        if (!result.empty()) result += "  ";
+        result += to_string(node->data);
+        appendAVLInorder(node->right, result);
+    }
+
 }
 // Constructor
-Game::Game() : maxHeap(10)
+Game::Game() : sandboxHeap(20), maxHeap(10)
 {
     maxHeap.insert(50);
     maxHeap.insert(30);
@@ -104,6 +148,8 @@ Game::Game() : maxHeap(10)
     rebuildAVLVisualTree();
 
     positionGameplayTree();;
+    loadLeaderboard();
+    resetSandbox();
 }
 
 // Main game loop
@@ -143,6 +189,24 @@ void Game::processEvents()
         // ---------------------------------
         if (const auto* text = event->getIf<Event::TextEntered>())
         {
+            // SANDBOX numeric input
+            if (currentScreen == SANDBOX && sandboxInputActive)
+            {
+                if (text->unicode >= '0' && text->unicode <= '9' && sandboxInput.length() < 9)
+                    sandboxInput.push_back(static_cast<char>(text->unicode));
+                else if (text->unicode == 8 && !sandboxInput.empty())
+                    sandboxInput.pop_back();
+            }
+
+            // LEADERBOARD player name input
+            if (currentScreen == LEADERBOARD && leaderboardNameActive)
+            {
+                if (text->unicode >= 32 && text->unicode <= 126 && leaderboardName.length() < 16)
+                    leaderboardName.push_back(static_cast<char>(text->unicode));
+                else if (text->unicode == 8 && !leaderboardName.empty())
+                    leaderboardName.pop_back();
+            }
+
             // ACT 1 - dedicated answer fields (kept separate from other Acts)
             if (currentScreen == GAMEPLAY && selectedAct == 1 && binaryInputField != 0)
             {
@@ -347,11 +411,11 @@ void Game::render()
     }
     else if (currentScreen == SANDBOX)
     {
-        drawPlaceholder("SANDBOX", "Sandbox mode is coming soon.");
+        drawSandbox();
     }
     else if (currentScreen == LEADERBOARD)
     {
-        drawPlaceholder("LEADERBOARD", "Leaderboard is coming soon.");
+        drawLeaderboard();
     }
 
     window.display();
@@ -373,10 +437,13 @@ void Game::handleMouseClick(Vector2i mousePosition)
         }
         else if (isMouseOver(mousePosition, { centerX - 150.f, 335.f }, { 300.f, 55.f }))
         {
+            resetSandbox();
             currentScreen = SANDBOX;
         }
         else if (isMouseOver(mousePosition, { centerX - 150.f, 410.f }, { 300.f, 55.f }))
         {
+            leaderboardNameActive = false;
+            leaderboardMessage = "Complete campaign levels to earn points.";
             currentScreen = LEADERBOARD;
         }
     }
@@ -900,9 +967,9 @@ void Game::handleMouseClick(Vector2i mousePosition)
                     bstComparisons = 0;
                     bstSearchPathLength = 0;
 
-            clearHighlights(visualRoot);
-        }
-    }
+                    clearHighlights(visualRoot);
+                }
+            }
 
             // LEVEL 1 - SEARCH HEIST
             else if (selectedLevel == 1)
@@ -1249,18 +1316,12 @@ void Game::handleMouseClick(Vector2i mousePosition)
 
     else if (currentScreen == SANDBOX)
     {
-        if (isMouseOver(mousePosition, { 30.f, 600.f }, { 150.f, 50.f }))
-        {
-            currentScreen = MAIN_MENU;
-        }
+        handleSandboxClick(mousePosition);
     }
 
     else if (currentScreen == LEADERBOARD)
     {
-        if (isMouseOver(mousePosition, { 30.f, 600.f }, { 150.f, 50.f }))
-        {
-            currentScreen = MAIN_MENU;
-        }
+        handleLeaderboardClick(mousePosition);
     }
 }
 
@@ -1268,6 +1329,10 @@ void Game::completeCurrentLevel()
 {
     int actIndex = selectedAct - 1;
     int levelIndex = selectedLevel - 1;
+
+    // Award points only the first time this level is completed.
+    if (!levelCompleted[actIndex][levelIndex])
+        playerScore += 100;
 
     // Mark current level as completed
     levelCompleted[actIndex][levelIndex] = true;
@@ -1564,6 +1629,525 @@ void Game::drawGameplay()
     }
 }
 
+
+
+// ============================================================
+// SANDBOX MODE - independent practice using the project's DS
+// ============================================================
+
+void Game::resetSandbox()
+{
+    int pre[] = { 50, 30, 20, 40, 70, 60, 80 };
+    int in[] = { 20, 30, 40, 50, 60, 70, 80 };
+    sandboxBinaryTree.buildFromPreorderInorder(pre, in, 7);
+
+    sandboxBST.clear();
+    sandboxBST.insert(50);
+    sandboxBST.insert(30);
+    sandboxBST.insert(70);
+    sandboxBST.insert(20);
+    sandboxBST.insert(40);
+    sandboxBST.insert(60);
+    sandboxBST.insert(80);
+
+    sandboxAVLTree.reset();
+    sandboxAVLTree.insert(50);
+    sandboxAVLTree.insert(30);
+    sandboxAVLTree.insert(70);
+    sandboxAVLTree.insert(20);
+    sandboxAVLTree.insert(40);
+    sandboxAVLTree.insert(60);
+    sandboxAVLTree.insert(80);
+
+    int heapValues[] = { 20, 50, 35, 10, 40, 25 };
+    sandboxHeap.loadArray(heapValues, 6);
+
+    sandboxInput.clear();
+    sandboxInputActive = false;
+    sandboxOutput = "Sandbox reset. Select an operation to experiment.";
+}
+
+void Game::runSandboxOperation(int operation)
+{
+    int value = 0;
+    bool needsValue =
+        (sandboxStructure == 2 && (operation == 1 || operation == 2 || operation == 3)) ||
+        (sandboxStructure == 3 && (operation == 1 || operation == 2)) ||
+        (sandboxStructure == 4 && operation == 1);
+
+    if (needsValue)
+    {
+        if (sandboxInput.empty())
+        {
+            sandboxOutput = "Enter a numeric value first.";
+            return;
+        }
+        try { value = stoi(sandboxInput); }
+        catch (...) { sandboxOutput = "Invalid number."; return; }
+    }
+
+    if (sandboxStructure == 1)
+    {
+        Node* root = sandboxBinaryTree.getRoot();
+        if (operation == 1) sandboxOutput = "PREORDER: " + getBinaryTraversal(root, 0);
+        else if (operation == 2) sandboxOutput = "INORDER: " + getBinaryTraversal(root, 1);
+        else if (operation == 3) sandboxOutput = "POSTORDER: " + getBinaryTraversal(root, 2);
+        else if (operation == 4) sandboxOutput = "LEVEL ORDER: " + getBinaryTraversal(root, 3);
+        else if (operation == 5) sandboxOutput = "Tree height: " + to_string(sandboxBinaryTree.height()) + " levels.";
+        else if (operation == 6) sandboxOutput = "Tree diameter: " + to_string(sandboxBinaryTree.diameter()) + " nodes.";
+        else if (operation == 7)
+        {
+            sandboxBinaryTree.mirror();
+            sandboxOutput = "Binary tree mirrored. New preorder: " + getBinaryTraversal(sandboxBinaryTree.getRoot(), 0);
+        }
+    }
+    else if (sandboxStructure == 2)
+    {
+        if (operation == 1)
+        {
+            int path[100], length = 0;
+            if (sandboxBST.search(value, path, &length))
+                sandboxOutput = "Value already exists in the BST.";
+            else
+            {
+                sandboxBST.insert(value);
+                sandboxOutput = "Inserted " + to_string(value) + " into the BST.";
+            }
+        }
+        else if (operation == 2)
+        {
+            int path[100], length = 0;
+            if (sandboxBST.search(value, path, &length))
+            {
+                sandboxOutput = "Found. Search path: ";
+                for (int i = 0; i < length; ++i)
+                {
+                    if (i) sandboxOutput += " -> ";
+                    sandboxOutput += to_string(path[i]);
+                }
+            }
+            else sandboxOutput = "Value not found in the BST.";
+        }
+        else if (operation == 3)
+        {
+            sandboxOutput = sandboxBST.deleteValue(value) ?
+                "Deleted " + to_string(value) + " from the BST." :
+                "Value not found; nothing deleted.";
+        }
+        else if (operation == 4)
+        {
+            sandboxBST.clear();
+            sandboxOutput = "BST cleared.";
+        }
+
+        string values;
+        appendInorder(sandboxBST.getRoot(), values);
+        sandboxOutput += "\nBST INORDER: " + (values.empty() ? string("empty") : values);
+    }
+    else if (sandboxStructure == 3)
+    {
+        if (operation == 1)
+        {
+            sandboxAVLTree.insert(value);
+            sandboxOutput = "Inserted " + to_string(value) + ". " + sandboxAVLTree.getLastRotation();
+            if (sandboxAVLTree.getLastRotation().empty()) sandboxOutput = "Inserted " + to_string(value) + "; no rotation required.";
+        }
+        else if (operation == 2)
+        {
+            sandboxAVLTree.remove(value);
+            sandboxOutput = "Delete operation applied for " + to_string(value) + ". " + sandboxAVLTree.getLastRotation();
+        }
+        else if (operation == 3)
+            sandboxOutput = sandboxAVLTree.isBalanced() ? "AVL property is satisfied." : "AVL property is violated.";
+        else if (operation == 4)
+        {
+            sandboxAVLTree.reset();
+            sandboxOutput = "AVL tree reset.";
+        }
+
+        string values;
+        appendAVLInorder(sandboxAVLTree.getRoot(), values);
+        sandboxOutput += "\nAVL INORDER: " + (values.empty() ? string("empty") : values);
+    }
+    else if (sandboxStructure == 4)
+    {
+        if (operation == 1)
+        {
+            if (sandboxInput.empty()) { sandboxOutput = "Enter a numeric value first."; return; }
+            sandboxHeap.insert(value);
+            sandboxOutput = "Inserted " + to_string(value) + " into the Max Heap.";
+        }
+        else if (operation == 2)
+        {
+            int maximum = 0;
+            sandboxOutput = sandboxHeap.extractMax(&maximum) ?
+                "Extracted maximum: " + to_string(maximum) :
+                "Heap is empty.";
+        }
+        else if (operation == 3)
+        {
+            sandboxHeap.buildMaxHeap();
+            sandboxOutput = "Build-Max-Heap completed.";
+        }
+        else if (operation == 4)
+        {
+            sandboxHeap.heapSort();
+            sandboxOutput = "Heap Sort completed.";
+        }
+        else if (operation == 5)
+            sandboxOutput = sandboxHeap.isMaxHeap() ? "Max Heap property is valid." : "Max Heap property is NOT valid.";
+
+        sandboxOutput += "\nHEAP ARRAY: ";
+        if (sandboxHeap.getSize() == 0) sandboxOutput += "empty";
+        for (int i = 0; i < sandboxHeap.getSize(); ++i)
+        {
+            int item = 0;
+            sandboxHeap.getValueAt(i, &item);
+            if (i) sandboxOutput += "  ";
+            sandboxOutput += to_string(item);
+        }
+    }
+
+    sandboxInput.clear();
+    sandboxInputActive = false;
+}
+
+void Game::drawSandbox()
+{
+    float width = static_cast<float>(window.getSize().x);
+    drawCenteredText("SANDBOX - DATA STRUCTURE LAB", 45.f, 30);
+    drawText("Choose a structure", { 35.f, 105.f }, 19);
+
+    drawButton("BINARY TREE", { 30.f, 145.f }, { 205.f, 42.f }, sandboxStructure != 1);
+    drawButton("BST", { 30.f, 198.f }, { 205.f, 42.f }, sandboxStructure != 2);
+    drawButton("AVL TREE", { 30.f, 251.f }, { 205.f, 42.f }, sandboxStructure != 3);
+    drawButton("MAX HEAP", { 30.f, 304.f }, { 205.f, 42.f }, sandboxStructure != 4);
+
+    drawPanel({ 255.f, 100.f }, { width - 275.f, 480.f });
+    drawText("WORKSPACE", { 280.f, 120.f }, 22);
+
+    string structureName = sandboxStructure == 1 ? "BINARY TREE" :
+        sandboxStructure == 2 ? "BINARY SEARCH TREE" :
+        sandboxStructure == 3 ? "AVL TREE" : "MAX HEAP";
+    drawText("ACTIVE STRUCTURE: " + structureName, { 280.f, 165.f }, 17);
+
+    drawText("INPUT VALUE", { 280.f, 220.f }, 15);
+    RectangleShape inputBox({ 210.f, 38.f });
+    inputBox.setPosition({ 280.f, 250.f });
+    inputBox.setFillColor(Color(18, 22, 35));
+    inputBox.setOutlineColor(sandboxInputActive ? Color(70, 180, 240) : Color(100, 120, 145));
+    inputBox.setOutlineThickness(2.f);
+    window.draw(inputBox);
+    drawText(sandboxInput, { 292.f, 258.f }, 18);
+    drawText("Click the input box, type digits, then choose an operation.", { 280.f, 305.f }, 13);
+
+    drawText("OPERATIONS", { 560.f, 220.f }, 18);
+    if (sandboxStructure == 1)
+    {
+        drawButton("PREORDER", { 560.f, 255.f }, { 170.f, 38.f });
+        drawButton("INORDER", { 745.f, 255.f }, { 170.f, 38.f });
+        drawButton("POSTORDER", { 560.f, 302.f }, { 170.f, 38.f });
+        drawButton("LEVEL ORDER", { 745.f, 302.f }, { 170.f, 38.f });
+        drawButton("HEIGHT", { 560.f, 349.f }, { 170.f, 38.f });
+        drawButton("DIAMETER", { 745.f, 349.f }, { 170.f, 38.f });
+        drawButton("MIRROR TREE", { 560.f, 396.f }, { 355.f, 38.f });
+    }
+    else if (sandboxStructure == 2)
+    {
+        drawButton("INSERT", { 560.f, 255.f }, { 170.f, 38.f });
+        drawButton("SEARCH", { 745.f, 255.f }, { 170.f, 38.f });
+        drawButton("DELETE", { 560.f, 302.f }, { 170.f, 38.f });
+        drawButton("CLEAR BST", { 745.f, 302.f }, { 170.f, 38.f });
+    }
+    else if (sandboxStructure == 3)
+    {
+        drawButton("INSERT", { 560.f, 255.f }, { 170.f, 38.f });
+        drawButton("DELETE", { 745.f, 255.f }, { 170.f, 38.f });
+        drawButton("CHECK BALANCE", { 560.f, 302.f }, { 170.f, 38.f });
+        drawButton("RESET AVL", { 745.f, 302.f }, { 170.f, 38.f });
+    }
+    else
+    {
+        drawButton("INSERT", { 560.f, 255.f }, { 170.f, 38.f });
+        drawButton("EXTRACT MAX", { 745.f, 255.f }, { 170.f, 38.f });
+        drawButton("BUILD HEAP", { 560.f, 302.f }, { 170.f, 38.f });
+        drawButton("HEAP SORT", { 745.f, 302.f }, { 170.f, 38.f });
+        drawButton("CHECK PROPERTY", { 560.f, 349.f }, { 355.f, 38.f });
+    }
+
+    drawText("RESULT", { 280.f, 455.f }, 18);
+    drawText(sandboxOutput, { 280.f, 490.f }, 14);
+    drawButton("RESET SANDBOX", { 560.f, 530.f }, { 170.f, 38.f });
+    drawButton("BACK", { 30.f, 620.f }, { 150.f, 50.f });
+}
+
+void Game::handleSandboxClick(Vector2i mousePosition)
+{
+    if (isMouseOver(mousePosition, { 30.f, 620.f }, { 150.f, 50.f }))
+    {
+        sandboxInputActive = false;
+        currentScreen = MAIN_MENU;
+        return;
+    }
+
+    if (isMouseOver(mousePosition, { 30.f, 145.f }, { 205.f, 42.f })) sandboxStructure = 1;
+    else if (isMouseOver(mousePosition, { 30.f, 198.f }, { 205.f, 42.f })) sandboxStructure = 2;
+    else if (isMouseOver(mousePosition, { 30.f, 251.f }, { 205.f, 42.f })) sandboxStructure = 3;
+    else if (isMouseOver(mousePosition, { 30.f, 304.f }, { 205.f, 42.f })) sandboxStructure = 4;
+    else if (isMouseOver(mousePosition, { 280.f, 250.f }, { 210.f, 38.f }))
+    {
+        sandboxInputActive = true;
+        return;
+    }
+    else if (isMouseOver(mousePosition, { 560.f, 530.f }, { 170.f, 38.f }))
+    {
+        resetSandbox();
+        return;
+    }
+    else
+    {
+        int operation = 0;
+        if (sandboxStructure == 1)
+        {
+            if (isMouseOver(mousePosition, { 560.f, 255.f }, { 170.f, 38.f })) operation = 1;
+            else if (isMouseOver(mousePosition, { 745.f, 255.f }, { 170.f, 38.f })) operation = 2;
+            else if (isMouseOver(mousePosition, { 560.f, 302.f }, { 170.f, 38.f })) operation = 3;
+            else if (isMouseOver(mousePosition, { 745.f, 302.f }, { 170.f, 38.f })) operation = 4;
+            else if (isMouseOver(mousePosition, { 560.f, 349.f }, { 170.f, 38.f })) operation = 5;
+            else if (isMouseOver(mousePosition, { 745.f, 349.f }, { 170.f, 38.f })) operation = 6;
+            else if (isMouseOver(mousePosition, { 560.f, 396.f }, { 355.f, 38.f })) operation = 7;
+        }
+        else if (sandboxStructure == 2)
+        {
+            if (isMouseOver(mousePosition, { 560.f, 255.f }, { 170.f, 38.f })) operation = 1;
+            else if (isMouseOver(mousePosition, { 745.f, 255.f }, { 170.f, 38.f })) operation = 2;
+            else if (isMouseOver(mousePosition, { 560.f, 302.f }, { 170.f, 38.f })) operation = 3;
+            else if (isMouseOver(mousePosition, { 745.f, 302.f }, { 170.f, 38.f })) operation = 4;
+        }
+        else if (sandboxStructure == 3)
+        {
+            if (isMouseOver(mousePosition, { 560.f, 255.f }, { 170.f, 38.f })) operation = 1;
+            else if (isMouseOver(mousePosition, { 745.f, 255.f }, { 170.f, 38.f })) operation = 2;
+            else if (isMouseOver(mousePosition, { 560.f, 302.f }, { 170.f, 38.f })) operation = 3;
+            else if (isMouseOver(mousePosition, { 745.f, 302.f }, { 170.f, 38.f })) operation = 4;
+        }
+        else
+        {
+            if (isMouseOver(mousePosition, { 560.f, 255.f }, { 170.f, 38.f })) operation = 1;
+            else if (isMouseOver(mousePosition, { 745.f, 255.f }, { 170.f, 38.f })) operation = 2;
+            else if (isMouseOver(mousePosition, { 560.f, 302.f }, { 170.f, 38.f })) operation = 3;
+            else if (isMouseOver(mousePosition, { 745.f, 302.f }, { 170.f, 38.f })) operation = 4;
+            else if (isMouseOver(mousePosition, { 560.f, 349.f }, { 355.f, 38.f })) operation = 5;
+        }
+
+        if (operation != 0)
+        {
+            if ((sandboxStructure == 2 || sandboxStructure == 3 || sandboxStructure == 4) &&
+                (operation == 1 || (sandboxStructure == 2 && (operation == 2 || operation == 3)) ||
+                    (sandboxStructure == 3 && operation == 2)))
+            {
+                if (sandboxInput.empty())
+                {
+                    sandboxOutput = "Enter a numeric value first.";
+                    return;
+                }
+                try { (void)stoi(sandboxInput); }
+                catch (...) { sandboxOutput = "Invalid number."; return; }
+            }
+            runSandboxOperation(operation);
+        }
+    }
+}
+
+// Load saved leaderboard entries from leaderboard.txt.
+// Each line uses: score|player name
+void Game::loadLeaderboard()
+{
+    leaderboardCount = 0;
+
+    ifstream inputFile("leaderboard.txt");
+    if (!inputFile.is_open())
+    {
+        // The file will be created when the first score is submitted.
+        return;
+    }
+
+    string line;
+    while (getline(inputFile, line))
+    {
+        size_t separator = line.find('|');
+        if (separator == string::npos) continue;
+
+        string scoreText = line.substr(0, separator);
+        string name = line.substr(separator + 1);
+
+        if (name.empty()) continue;
+
+        int score = 0;
+        try
+        {
+            score = stoi(scoreText);
+        }
+        catch (...)
+        {
+            continue;
+        }
+
+        if (score < 0) continue;
+
+        // Insert each loaded entry into the fixed-size array in score order.
+        if (leaderboardCount == LEADERBOARD_CAPACITY &&
+            score <= leaderboardScores[LEADERBOARD_CAPACITY - 1])
+        {
+            continue;
+        }
+
+        int position = leaderboardCount;
+        if (position >= LEADERBOARD_CAPACITY)
+            position = LEADERBOARD_CAPACITY - 1;
+
+        while (position > 0 && leaderboardScores[position - 1] < score)
+        {
+            if (position < LEADERBOARD_CAPACITY)
+            {
+                leaderboardScores[position] = leaderboardScores[position - 1];
+                leaderboardNames[position] = leaderboardNames[position - 1];
+            }
+            --position;
+        }
+
+        if (position < LEADERBOARD_CAPACITY)
+        {
+            leaderboardScores[position] = score;
+            leaderboardNames[position] = name;
+            if (leaderboardCount < LEADERBOARD_CAPACITY)
+                ++leaderboardCount;
+        }
+    }
+
+    inputFile.close();
+}
+
+// Save the current top 10 entries to leaderboard.txt.
+bool Game::saveLeaderboard()
+{
+    ofstream outputFile("leaderboard.txt", ios::out | ios::trunc);
+    if (!outputFile.is_open())
+        return false;
+
+    for (int i = 0; i < leaderboardCount; ++i)
+    {
+        outputFile << leaderboardScores[i] << '|' << leaderboardNames[i] << '\n';
+    }
+
+    outputFile.close();
+    return !outputFile.fail();
+}
+
+void Game::drawLeaderboard()
+{
+    drawCenteredText("LEADERBOARD", 55.f, 40);
+    drawCenteredText("Campaign points - 100 points for each first-time level completion", 105.f, 16);
+
+    drawPanel({ 100.f, 145.f }, { 800.f, 390.f });
+    drawText("RANK", { 145.f, 165.f }, 17);
+    drawText("PLAYER", { 260.f, 165.f }, 17);
+    drawText("SCORE", { 690.f, 165.f }, 17);
+
+    if (leaderboardCount == 0)
+        drawText("No scores submitted yet.", { 145.f, 215.f }, 18);
+
+    for (int i = 0; i < leaderboardCount; ++i)
+    {
+        drawText(to_string(i + 1), { 150.f, 205.f + i * 29.f }, 16);
+        drawText(leaderboardNames[i], { 260.f, 205.f + i * 29.f }, 16);
+        drawText(to_string(leaderboardScores[i]), { 690.f, 205.f + i * 29.f }, 16);
+    }
+
+    drawText("YOUR CAMPAIGN SCORE: " + to_string(playerScore), { 120.f, 555.f }, 18);
+    drawText("PLAYER NAME:", { 440.f, 555.f }, 15);
+
+    RectangleShape nameBox({ 210.f, 36.f });
+    nameBox.setPosition({ 570.f, 548.f });
+    nameBox.setFillColor(Color(18, 22, 35));
+    nameBox.setOutlineColor(leaderboardNameActive ? Color(70, 180, 240) : Color(100, 120, 145));
+    nameBox.setOutlineThickness(2.f);
+    window.draw(nameBox);
+    drawText(leaderboardName, { 580.f, 555.f }, 16);
+
+    drawButton("SUBMIT SCORE", { 790.f, 548.f }, { 150.f, 38.f }, playerScore > 0);
+    drawText(leaderboardMessage, { 120.f, 600.f }, 14);
+    drawButton("BACK", { 30.f, 640.f }, { 150.f, 45.f });
+}
+
+void Game::handleLeaderboardClick(Vector2i mousePosition)
+{
+    if (isMouseOver(mousePosition, { 30.f, 640.f }, { 150.f, 45.f }))
+    {
+        leaderboardNameActive = false;
+        currentScreen = MAIN_MENU;
+    }
+    else if (isMouseOver(mousePosition, { 570.f, 548.f }, { 210.f, 36.f }))
+    {
+        leaderboardNameActive = true;
+    }
+    else if (isMouseOver(mousePosition, { 790.f, 548.f }, { 150.f, 38.f }))
+    {
+        leaderboardNameActive = false;
+        submitLeaderboardScore();
+    }
+}
+
+void Game::submitLeaderboardScore()
+{
+    if (playerScore <= 0)
+    {
+        leaderboardMessage = "Complete at least one campaign level before submitting.";
+        return;
+    }
+    if (leaderboardName.empty())
+    {
+        leaderboardMessage = "Enter your player name first.";
+        return;
+    }
+
+    if (leaderboardCount == LEADERBOARD_CAPACITY &&
+        playerScore <= leaderboardScores[LEADERBOARD_CAPACITY - 1])
+    {
+        leaderboardMessage = "Your score did not reach the top 10.";
+        return;
+    }
+
+    int position = leaderboardCount;
+    if (position >= LEADERBOARD_CAPACITY) position = LEADERBOARD_CAPACITY - 1;
+
+    while (position > 0 && leaderboardScores[position - 1] < playerScore)
+    {
+        if (position < LEADERBOARD_CAPACITY)
+        {
+            leaderboardScores[position] = leaderboardScores[position - 1];
+            leaderboardNames[position] = leaderboardNames[position - 1];
+        }
+        --position;
+    }
+
+    if (position < LEADERBOARD_CAPACITY)
+    {
+        leaderboardScores[position] = playerScore;
+        leaderboardNames[position] = leaderboardName;
+        if (leaderboardCount < LEADERBOARD_CAPACITY) ++leaderboardCount;
+
+        if (saveLeaderboard())
+            leaderboardMessage = "Score submitted and saved successfully!";
+        else
+            leaderboardMessage = "Score ranked, but leaderboard.txt could not be saved.";
+    }
+    else
+    {
+        leaderboardMessage = "Your score did not reach the top 10.";
+    }
+    leaderboardName.clear();
+}
 
 // Draw placeholder screens
 void Game::drawPlaceholder(const string& title, const string& message)

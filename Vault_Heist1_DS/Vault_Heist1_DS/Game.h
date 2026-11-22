@@ -50,13 +50,42 @@ private:
     bool binarySymmetryChecked = false;
     bool binaryMirrored = false;
     bool binaryUsePostorder = false;
-    int binaryInputField = 0; // 0 = none, 1/2 = currently selected answer field
+    int binaryInputField = 0;
     string binaryAnswerInput = "";
     string binaryHeightInput = "";
     string binaryDiameterInput = "";
     string binaryLcaInput = "";
     string binaryPathInput = "";
     string binaryMirrorInput = "";
+
+    // SANDBOX - independent instances so campaign data is not changed
+    BinaryTree sandboxBinaryTree;
+    BST sandboxBST;
+    AVLTree sandboxAVLTree;
+    MaxHeap sandboxHeap;
+    int sandboxStructure = 1; // 1 Binary Tree, 2 BST, 3 AVL, 4 Max Heap
+    string sandboxInput = "";
+    string sandboxOutput = "Choose a data structure to begin.";
+    bool sandboxInputActive = false;
+    void resetSandbox();
+    void drawSandbox();
+    void handleSandboxClick(Vector2i mousePosition);
+    void runSandboxOperation(int operation);
+
+    // LEADERBOARD - fixed-size array ranked by score
+    static const int LEADERBOARD_CAPACITY = 10;
+    string leaderboardNames[LEADERBOARD_CAPACITY];
+    int leaderboardScores[LEADERBOARD_CAPACITY] = {};
+    int leaderboardCount = 0;
+    int playerScore = 0;
+    string leaderboardName = "";
+    bool leaderboardNameActive = false;
+    string leaderboardMessage = "Complete campaign levels to earn points.";
+    void drawLeaderboard();
+    void handleLeaderboardClick(Vector2i mousePosition);
+    void submitLeaderboardScore();
+    void loadLeaderboard();
+    bool saveLeaderboard();
 
     // ACT 2 - BST
     bool bstLevelSuccess = false;
@@ -191,19 +220,14 @@ private:
     MaxHeap maxHeap;
     VisualNode* heapVisualRoot = nullptr;
     int selectedHeapIndex = -1;
-    // ACT 4 - HEAP LEVEL PROGRESS
     bool heapLevelSuccess = false;
-
     int heapExtractedValues[20] = {};
     int heapExtractedCount = 0;
-
     int heapSteps = 0;
     int heapAlarmLimit = 8;
-
     int previousHeapExtractedCount = 0;
     int previousHeapSteps = 0;
     bool previousHeapLevelSuccess = false;
-
     void highlightHeapNode(VisualNode* node, int targetIndex, int currentIndex = 0);
     void loadHeapLevel();
     string heapInput = "";
