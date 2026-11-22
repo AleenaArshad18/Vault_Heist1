@@ -276,6 +276,10 @@ void Game::render()
             drawHeapGameplay();
         }
     }
+    else if (currentScreen == RESULT_SCREEN)
+    {
+        drawResultScreen();
+    }
     else if (currentScreen == SANDBOX)
     {
         drawPlaceholder("SANDBOX", "Sandbox mode is coming soon.");
@@ -314,60 +318,66 @@ void Game::handleMouseClick(Vector2i mousePosition)
 
     else if (currentScreen == CAMPAIGN_MAP)
     {
-        if (isMouseOver(mousePosition,
-            { centerX - 150.f, 210.f }, { 300.f, 60.f }))
-        { // act 1
+        if (isMouseOver(mousePosition, { centerX - 150.f, 210.f }, { 300.f, 60.f })
+            && actUnlocked[0])
+        {
             selectedAct = 1;
             currentScreen = LEVEL_SELECT;
         }
-        else if (isMouseOver(mousePosition,
-            { centerX - 150.f, 290.f }, { 300.f, 60.f }))
-        { //act 2 
+        else if (isMouseOver(mousePosition, { centerX - 150.f, 290.f }, { 300.f, 60.f })
+            && actUnlocked[1])
+        {
             selectedAct = 2;
             currentScreen = LEVEL_SELECT;
         }
-        else if (isMouseOver(mousePosition,
-            { centerX - 150.f, 370.f }, { 300.f, 60.f }))
-        { //act  3
+        else if (isMouseOver(mousePosition, { centerX - 150.f, 370.f }, { 300.f, 60.f })
+            && actUnlocked[2])
+        {
             selectedAct = 3;
             currentScreen = LEVEL_SELECT;
         }
-        else if (isMouseOver(mousePosition,
-            { centerX - 150.f, 450.f }, { 300.f, 60.f }))
-        { // act 4
+        else if (isMouseOver(mousePosition, { centerX - 150.f, 450.f }, { 300.f, 60.f })
+            && actUnlocked[3])
+        {
             selectedAct = 4;
             currentScreen = LEVEL_SELECT;
         }
-        else if (isMouseOver(mousePosition,
-            { 30.f, 600.f }, { 150.f, 50.f }))
-        { // back button
+        else if (isMouseOver(mousePosition, { 30.f, 600.f }, { 150.f, 50.f }))
+        {
             currentScreen = MAIN_MENU;
         }
     }
 
     else if (currentScreen == LEVEL_SELECT)
     {
-        if (isMouseOver(mousePosition, { centerX - 180.f, 230.f }, { 110.f, 65.f }))
+        int actIndex = selectedAct - 1;
+
+        if (isMouseOver(mousePosition, { centerX - 180.f, 230.f }, { 110.f, 65.f })
+            && levelUnlocked[actIndex][0])
         {
             selectedLevel = 1;
             currentScreen = LEVEL_INTRO;
         }
-        else if (isMouseOver(mousePosition, { centerX - 55.f, 230.f }, { 110.f, 65.f }))
+        else if (isMouseOver(mousePosition, { centerX - 55.f, 230.f }, { 110.f, 65.f })
+            && levelUnlocked[actIndex][1])
         {
             selectedLevel = 2;
             currentScreen = LEVEL_INTRO;
         }
-        else if (isMouseOver(mousePosition, { centerX + 70.f, 230.f }, { 110.f, 65.f }))
+        else if (isMouseOver(mousePosition, { centerX + 70.f, 230.f }, { 110.f, 65.f })
+            && levelUnlocked[actIndex][2])
         {
             selectedLevel = 3;
             currentScreen = LEVEL_INTRO;
         }
-        else if (isMouseOver(mousePosition, { centerX - 180.f, 320.f }, { 110.f, 65.f }))
+        else if (isMouseOver(mousePosition, { centerX - 180.f, 320.f }, { 110.f, 65.f })
+            && levelUnlocked[actIndex][3])
         {
             selectedLevel = 4;
             currentScreen = LEVEL_INTRO;
         }
-        else if (isMouseOver(mousePosition, { centerX - 55.f, 320.f }, { 110.f, 65.f }))
+        else if (isMouseOver(mousePosition, { centerX - 55.f, 320.f }, { 110.f, 65.f })
+            && levelUnlocked[actIndex][4])
         {
             selectedLevel = 5;
             currentScreen = LEVEL_INTRO;
@@ -407,6 +417,14 @@ void Game::handleMouseClick(Vector2i mousePosition)
             }
             else if (selectedAct == 1)
             {
+                binaryLevelSuccess = false;
+                binaryHeightShown = false;
+                binaryDiameterShown = false;
+                binaryLcaShown = false;
+                binaryPathShown = false;
+                binaryMirrorDone = false;
+                binarySymmetryChecked = false;
+
                 int pre[] = { 1, 2, 4, 5, 3 };
                 int in[] = { 4, 2, 5, 1, 3 };
                 binaryTree.buildFromPreorderInorder(pre, in, 5);
@@ -694,80 +712,170 @@ void Game::handleMouseClick(Vector2i mousePosition)
 
         else if (selectedAct == 1)
         {
+            if (isMouseOver(mousePosition,
+                { 800.f, 620.f }, { 170.f, 50.f }))
+            {
+                if (binaryLevelSuccess)
+                {
+                    binaryLevelSuccess = false;
+                    completeCurrentLevel();
+                }
+            }
+
             // ACT 1 - FIVE BINARY TREE CHALLENGES
-            if (selectedLevel == 1)
+            else if (selectedLevel == 1)
             {
                 if (isMouseOver(mousePosition, { width - 230.f, 190.f }, { 190.f, 38.f }))
+                {
+                    binaryLevelSuccess = true;
                     searchResult = "Correct! Preorder: 1 - 2 - 4 - 5 - 3";
+                }
                 else if (isMouseOver(mousePosition, { width - 230.f, 240.f }, { 190.f, 38.f }))
+                {
+                    binaryLevelSuccess = false;
                     searchResult = "Incorrect. Preorder visits Root, Left, Right.";
+                }
                 else if (isMouseOver(mousePosition, { width - 230.f, 290.f }, { 190.f, 38.f }))
+                {
+                    binaryLevelSuccess = false;
                     searchResult = "Incorrect. Try Root-Left-Right.";
+                }
                 else if (isMouseOver(mousePosition, { width - 230.f, 340.f }, { 190.f, 38.f }))
+                {
+                    binaryLevelSuccess = false;
                     searchResult = "Incorrect. Try Root-Left-Right.";
+                }
             }
+
+            
+
             else if (selectedLevel == 2)
             {
                 if (isMouseOver(mousePosition, { width - 230.f, 190.f }, { 190.f, 38.f }))
                 {
                     int pre[] = { 1, 2, 4, 5, 3 };
                     int in[] = { 4, 2, 5, 1, 3 };
+
                     binaryTree.buildFromPreorderInorder(pre, in, 5);
                     rebuildBinaryVisualTree();
+
+                    binaryLevelSuccess = true;
                     searchResult = "Reconstructed from Preorder + Inorder.";
                 }
                 else if (isMouseOver(mousePosition, { width - 230.f, 240.f }, { 190.f, 38.f }))
                 {
                     int post[] = { 4, 5, 2, 3, 1 };
                     int in[] = { 4, 2, 5, 1, 3 };
+
                     binaryTree.buildFromPostorderInorder(post, in, 5);
                     rebuildBinaryVisualTree();
+
+                    binaryLevelSuccess = true;
                     searchResult = "Reconstructed from Postorder + Inorder.";
                 }
             }
+
+
             else if (selectedLevel == 3)
             {
+                // SHOW HEIGHT
                 if (isMouseOver(mousePosition, { width - 230.f, 190.f }, { 190.f, 38.f }))
+                {
                     searchResult = "Height = " + to_string(binaryTree.height()) + " levels.";
-                else if (isMouseOver(mousePosition, { width - 230.f, 240.f }, { 190.f, 38.f }))
-                    searchResult = "Diameter = " + to_string(binaryTree.diameter()) + " nodes.";
-            }
-            else if (selectedLevel == 4)
-            {
-                if (isMouseOver(mousePosition, { width - 230.f, 190.f }, { 190.f, 38.f }))
-                    searchResult = "LCA(4, 5) = " + to_string(binaryTree.LCA(4, 5));
+
+                    binaryHeightShown = true;
+                }
+
+                // SHOW DIAMETER
                 else if (isMouseOver(mousePosition, { width - 230.f, 240.f }, { 190.f, 38.f }))
                 {
-                    int path[100], length = 0;
+                    searchResult = "Diameter = " + to_string(binaryTree.diameter()) + " nodes.";
+
+                    binaryDiameterShown = true;
+                }
+
+                // CHECK WHETHER BOTH TASKS ARE COMPLETED
+                binaryLevelSuccess = binaryHeightShown && binaryDiameterShown;
+            }
+
+
+
+            else if (selectedLevel == 4)
+            {
+                // FIND LOWEST COMMON ANCESTOR
+                if (isMouseOver(mousePosition, { width - 230.f, 190.f }, { 190.f, 38.f }))
+                {
+                    int ancestor = binaryTree.LCA(4, 5);
+
+                    if (ancestor != -1)
+                    {
+                        searchResult = "LCA(4, 5) = " + to_string(ancestor);
+                        binaryLcaShown = true;
+                    }
+                    else
+                    {
+                        searchResult = "One or both nodes not found.";
+                    }
+                }
+
+                // FIND PATH TO NODE 4
+                else if (isMouseOver(mousePosition, { width - 230.f, 240.f }, { 190.f, 38.f }))
+                {
+                    int path[100];
+                    int length = 0;
+
                     if (binaryTree.pathTo(4, path, length))
                     {
                         searchResult = "Path to 4: ";
+
                         for (int i = 0; i < length; ++i)
                         {
-                            if (i) searchResult += " -> ";
+                            if (i > 0)
+                                searchResult += " -> ";
+
                             searchResult += to_string(path[i]);
                         }
+
+                        binaryPathShown = true;
                     }
-                    else searchResult = "Node not found.";
+                    else
+                    {
+                        searchResult = "Node not found.";
+                    }
                 }
+
+                // CHECK COMPLETION
+                binaryLevelSuccess = binaryLcaShown && binaryPathShown;
             }
+
+
+
             else if (selectedLevel == 5)
             {
+                // MIRROR TREE
                 if (isMouseOver(mousePosition, { width - 230.f, 190.f }, { 190.f, 38.f }))
                 {
                     binaryTree.mirror();
                     rebuildBinaryVisualTree();
+
+                    binaryMirrorDone = true;
                     searchResult = "Tree mirrored successfully.";
                 }
-                else if (isMouseOver(mousePosition, { width - 230.f, 240.f }, { 190.f, 38.f }))
-                    searchResult = string("Symmetric? ") + (binaryTree.isSymmetric() ? "Yes" : "No");
-            }
 
-            if (isMouseOver(mousePosition, { 30.f, 620.f }, { 150.f, 50.f }))
-            {
-                searchResult = "";
-                currentScreen = LEVEL_INTRO;
-            }
+                // CHECK SYMMETRY
+                else if (isMouseOver(mousePosition, { width - 230.f, 240.f }, { 190.f, 38.f }))
+                {
+                    bool symmetric = binaryTree.isSymmetric();
+
+                    searchResult = string("Symmetric? ") +
+                        (symmetric ? "Yes" : "No");
+
+                    binarySymmetryChecked = true;
+                }
+
+                // CHECK COMPLETION
+                binaryLevelSuccess = binaryMirrorDone && binarySymmetryChecked;
+                }
         }
 
         else if (selectedAct == 3)
@@ -916,6 +1024,14 @@ void Game::handleMouseClick(Vector2i mousePosition)
                 currentScreen = LEVEL_INTRO;
             }
         }
+        else if (isMouseOver(mousePosition, { 760.f, 620.f }, { 200.f, 40.f }))
+        {
+        completeCurrentLevel();
+        }   
+    }
+    else if (currentScreen == RESULT_SCREEN)
+    {
+        handleResultClick(mousePosition);
     }
 
     else if (currentScreen == SANDBOX)
@@ -935,7 +1051,28 @@ void Game::handleMouseClick(Vector2i mousePosition)
     }
 }
 
+void Game::completeCurrentLevel()
+{
+    int actIndex = selectedAct - 1;
+    int levelIndex = selectedLevel - 1;
 
+    // Mark current level as completed
+    levelCompleted[actIndex][levelIndex] = true;
+
+    // Unlock the next level
+    if (selectedLevel < 5)
+    {
+        levelUnlocked[actIndex][levelIndex + 1] = true;
+    }
+    // Unlock the next act after completing Level 5
+    else if (selectedAct < 4)
+    {
+        actUnlocked[actIndex + 1] = true;
+        levelUnlocked[actIndex + 1][0] = true;
+    }
+
+    currentScreen = RESULT_SCREEN;
+}
 
 // Check whether mouse is inside a button
 bool Game::isMouseOver(Vector2i mousePosition, Vector2f position, Vector2f size)
@@ -965,21 +1102,21 @@ void Game::drawMainMenu()
 void Game::drawCampaignMap()
 {
     drawCenteredText("CAMPAIGN MAP", 90.f, 45);
-    drawCenteredText("Choose an act to continue", 150.f, 22);
+    drawCenteredText("Complete each act to unlock the next one", 150.f, 22);
 
     float centerX = static_cast<float>(window.getSize().x) / 2.f;
 
     drawButton("ACT 1 - BINARY TREE",
-        { centerX - 150.f, 210.f }, { 300.f, 60.f });
+        { centerX - 150.f, 210.f }, { 300.f, 60.f }, actUnlocked[0]);
 
     drawButton("ACT 2 - BST",
-        { centerX - 150.f, 290.f }, { 300.f, 60.f });
+        { centerX - 150.f, 290.f }, { 300.f, 60.f }, actUnlocked[1]);
 
     drawButton("ACT 3 - AVL TREE",
-        { centerX - 150.f, 370.f }, { 300.f, 60.f });
+        { centerX - 150.f, 370.f }, { 300.f, 60.f }, actUnlocked[2]);
 
     drawButton("ACT 4 - HEAP FORTRESS",
-        { centerX - 150.f, 450.f }, { 300.f, 60.f });
+        { centerX - 150.f, 450.f }, { 300.f, 60.f }, actUnlocked[3]);
 
     drawButton("BACK", { 30.f, 600.f }, { 150.f, 50.f });
 }
@@ -991,13 +1128,13 @@ void Game::drawLevelSelect()
     {
         drawCenteredText("ACT 1 - BINARY TREE", 100.f, 40);
     }
+    else if (selectedAct == 2)
+    {
+        drawCenteredText("ACT 2 - SORTED WING", 100.f, 40);
+    }
     else if (selectedAct == 3)
     {
         drawCenteredText("ACT 3 - AVL TREE", 100.f, 40);
-    }
-    if (selectedAct == 2)
-    {
-        drawCenteredText("ACT 2 - SORTED WING", 100.f, 40);
     }
     else if (selectedAct == 4)
     {
@@ -1008,12 +1145,27 @@ void Game::drawLevelSelect()
 
     float centerX = static_cast<float>(window.getSize().x) / 2.f;
 
-    drawButton("LEVEL 1", { centerX - 180.f, 230.f }, { 110.f, 65.f });
-    drawButton("LEVEL 2", { centerX - 55.f, 230.f }, { 110.f, 65.f });
-    drawButton("LEVEL 3", { centerX + 70.f, 230.f }, { 110.f, 65.f });
+    int actIndex = selectedAct - 1;
 
-    drawButton("LEVEL 4", { centerX - 180.f, 320.f }, { 110.f, 65.f });
-    drawButton("LEVEL 5", { centerX - 55.f, 320.f }, { 110.f, 65.f });
+    drawButton("LEVEL 1",
+        { centerX - 180.f, 230.f }, { 110.f, 65.f },
+        levelUnlocked[actIndex][0]);
+
+    drawButton("LEVEL 2",
+        { centerX - 55.f, 230.f }, { 110.f, 65.f },
+        levelUnlocked[actIndex][1]);
+
+    drawButton("LEVEL 3",
+        { centerX + 70.f, 230.f }, { 110.f, 65.f },
+        levelUnlocked[actIndex][2]);
+
+    drawButton("LEVEL 4",
+        { centerX - 180.f, 320.f }, { 110.f, 65.f },
+        levelUnlocked[actIndex][3]);
+
+    drawButton("LEVEL 5",
+        { centerX - 55.f, 320.f }, { 110.f, 65.f },
+        levelUnlocked[actIndex][4]);
 
     drawButton("BACK", { 30.f, 600.f }, { 150.f, 50.f });
 }
@@ -1195,6 +1347,8 @@ void Game::drawGameplay()
     drawButton("UNDO", { 220.f, 620.f }, { 150.f, 50.f });
     drawButton("HINT", { 410.f, 620.f }, { 150.f, 50.f });
     drawButton("RESET", { 600.f, 620.f }, { 150.f, 50.f });
+
+    drawButton("COMPLETE LEVEL", { 800.f, 620.f }, { 170.f, 50.f }, binaryLevelSuccess);
 }
 
 
@@ -2056,6 +2210,8 @@ void Game::drawBinaryGameplay()
         drawButton("CHECK SYMMETRY", { width - 230.f, 240.f }, { 190.f, 38.f });
     }
     drawText(searchResult, { width - 230.f, 330.f }, 13);
+    drawButton("COMPLETE LEVEL", { 800.f, 620.f },
+        { 170.f, 50.f }, binaryLevelSuccess);
     drawButton("BACK", { 30.f, 620.f }, { 150.f, 50.f });
 }
 
@@ -2150,4 +2306,83 @@ void Game::drawAVLGameplay()
         { width - 230.f, 390.f }, 12);
     drawText(searchResult, { width - 230.f, 425.f }, 12);
     drawButton("BACK", { 30.f, 620.f }, { 150.f, 50.f });
+}
+
+void Game::drawResultScreen()
+{
+    float centerX = static_cast<float>(window.getSize().x) / 2.f;
+
+    if (selectedAct == 4 && selectedLevel == 5)
+    {
+        drawCenteredText("CAMPAIGN COMPLETED!", 100.f, 42);
+        drawCenteredText("You have completed all four Acts!", 180.f, 24);
+    }
+    else
+    {
+        drawCenteredText("LEVEL COMPLETED!", 100.f, 42);
+        drawCenteredText("Well done! You completed the level.", 180.f, 24);
+    }
+
+    drawCenteredText(
+        "ACT " + to_string(selectedAct) +
+        " - LEVEL " + to_string(selectedLevel),
+        250.f, 25
+    );
+
+    drawButton(
+        "RETRY LEVEL",
+        { centerX - 150.f, 350.f },
+        { 300.f, 50.f }
+    );
+
+    if (selectedLevel < 5 || selectedAct < 4)
+    {
+        drawButton(
+            "NEXT LEVEL",
+            { centerX - 150.f, 420.f },
+            { 300.f, 50.f }
+        );
+    }
+
+    drawButton(
+        "CAMPAIGN MAP",
+        { centerX - 150.f, 490.f },
+        { 300.f, 50.f }
+    );
+}
+
+void Game::handleResultClick(Vector2i mousePosition)
+{
+    float centerX = static_cast<float>(window.getSize().x) / 2.f;
+
+    // Retry current level
+    if (isMouseOver(mousePosition,
+        { centerX - 150.f, 350.f }, { 300.f, 50.f }))
+    {
+        currentScreen = LEVEL_INTRO;
+    }
+
+    // Move to the next level
+    else if (isMouseOver(mousePosition,
+        { centerX - 150.f, 420.f }, { 300.f, 50.f }))
+    {
+        if (selectedLevel < 5)
+        {
+            selectedLevel++;
+        }
+        else if (selectedAct < 4)
+        {
+            selectedAct++;
+            selectedLevel = 1;
+        }
+
+        currentScreen = LEVEL_INTRO;
+    }
+
+    // Return to campaign map
+    else if (isMouseOver(mousePosition,
+        { centerX - 150.f, 490.f }, { 300.f, 50.f }))
+    {
+        currentScreen = CAMPAIGN_MAP;
+    }
 }

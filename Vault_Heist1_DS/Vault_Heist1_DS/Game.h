@@ -28,9 +28,18 @@ private:
     static const int GAMEPLAY = 4;
     static const int SANDBOX = 5;
     static const int LEADERBOARD = 6;
+    static const int RESULT_SCREEN = 7;
+
+    bool binaryLevelSuccess = false;
+    bool binaryHeightShown = false;
+    bool binaryDiameterShown = false;
+    bool binaryLcaShown = false;
+    bool binaryPathShown = false;
+    bool binaryMirrorDone = false;
+    bool binarySymmetryChecked = false;
 
     void processEvents();
-    //comment
+   
     void update();
     void render();
 
@@ -55,6 +64,10 @@ private:
     void drawHeapGameplay();
     void drawHeapArray();
     void drawHeapOperations();
+
+    void drawResultScreen();
+    void completeCurrentLevel();
+    void handleResultClick(Vector2i mousePosition);
 
     void positionGameplayTree();
     void shiftTree(VisualNode* node, float offsetX);
@@ -154,4 +167,18 @@ private:
 
     void addHeapEvent(string event);
     void drawHeapEventLog();
+
+    // Campaign progression
+    bool actUnlocked[4] = { true, false, false, false };
+
+    bool levelUnlocked[4][5] =
+    {
+        { true, false, false, false, false },
+        { false, false, false, false, false },
+        { false, false, false, false, false },
+        { false, false, false, false, false }
+    };
+
+    bool levelCompleted[4][5] = {};
+
 };
