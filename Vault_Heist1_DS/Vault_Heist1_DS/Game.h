@@ -111,6 +111,24 @@ private:
     int bstSearchPath[100];
     int bstSearchPathLength = 0;
 
+    // ACT 2 - LEVEL 2: INTERACTIVE INSERTION
+
+    Node* bstInsertCurrentNode = nullptr;
+    Node* bstInsertParentNode = nullptr;
+
+    int bstInsertValue = -1;
+    int bstInsertComparisons = 0;
+
+    bool bstInsertStarted = false;
+    bool bstInsertReadyToInsert = false;
+    bool bstInsertLeft = false;
+
+    void startBSTInsertion();
+    void moveBSTInsertLeft();
+    void moveBSTInsertRight();
+    void confirmBSTInsertion();
+    void resetBSTInsertion();
+
     // Act 2 - BST level drawing
     void drawBSTLevel1();
     void drawBSTLevel2();

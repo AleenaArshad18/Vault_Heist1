@@ -746,30 +746,42 @@ else if (selectedAct == 2)
     }
 
     // RESET BUTTON
+    // RESET BUTTON
     else if (isMouseOver(mousePosition, { 600.f, 620.f }, { 150.f, 50.f }))
     {
-        if (selectedLevel == 4)
+        // LEVEL 2 - STASH LOOT
+        if (selectedLevel == 2)
+        {
+            resetBSTInsertion();
+        }
+
+        // LEVEL 4 - RANGE RAID
+        else if (selectedLevel == 4)
         {
             resetRangeRaid();
         }
 
-        searchInput = "";
-        searchResult = "";
-        searchInputActive = false;
+        // OTHER BST LEVELS
+        else
+        {
+            searchInput = "";
+            searchResult = "";
+            searchInputActive = false;
 
-        rangeLowInput = "";
-        rangeHighInput = "";
-        rangeLowInputActive = false;
-        rangeHighInputActive = false;
+            rangeLowInput = "";
+            rangeHighInput = "";
+            rangeLowInputActive = false;
+            rangeHighInputActive = false;
 
-        bstLevelSuccess = false;
-        bstSearchStarted = false;
-        bstSearchTarget = -1;
-        bstCurrentNode = nullptr;
-        bstComparisons = 0;
-        bstSearchPathLength = 0;
+            bstLevelSuccess = false;
+            bstSearchStarted = false;
+            bstSearchTarget = -1;
+            bstCurrentNode = nullptr;
+            bstComparisons = 0;
+            bstSearchPathLength = 0;
 
-        clearHighlights(visualRoot);
+            clearHighlights(visualRoot);
+        }
     }
 
     // LEVEL 1 - SEARCH HEIST
@@ -2898,29 +2910,72 @@ void Game::drawBSTLevel2()
 {
     float width = static_cast<float>(window.getSize().x);
 
-    drawText("STASH LOOT", { width - 230.f, 120.f }, 21);
-    drawText("VALUE TO INSERT", { width - 230.f, 175.f }, 16);
+    drawText("STASH LOOT", { width - 230.f, 120.f }, 20);
 
-    RectangleShape inputBox({ 190.f, 40.f });
-    inputBox.setPosition({ width - 230.f, 205.f });
-    inputBox.setFillColor(Color(18, 22, 35));
-    inputBox.setOutlineColor(searchInputActive ?
-        Color(70, 180, 240) : Color(100, 120, 145));
-    inputBox.setOutlineThickness(2.f);
-    window.draw(inputBox);
+    // BEFORE INSERTION STARTS
+    if (!bstInsertStarted)
+    {
+        drawText("VALUE TO INSERT:", { width - 230.f, 175.f }, 15);
 
-    drawText(searchInput.empty() ? "Enter value..." : searchInput,
-        { width - 220.f, 215.f }, 18);
+        drawPanel({ width - 230.f, 205.f }, { 190.f, 40.f });
+        drawText(searchInput.empty() ? "ENTER VALUE..." : searchInput,
+            { width - 220.f, 213.f }, 16);
 
-    drawButton("INSERT VALUE",
-        { width - 230.f, 265.f }, { 190.f, 40.f });
+        drawButton("START INSERTION",
+            { width - 230.f, 265.f }, { 190.f, 40.f });
+    }
+    else
+    {
+        drawText("INSERTING: " + to_string(bstInsertValue),
+            { width - 230.f, 175.f }, 15);
 
-    drawText("BST RULE:", { width - 230.f, 340.f }, 15);
-    drawText("Smaller = LEFT", { width - 230.f, 370.f }, 14);
-    drawText("Larger = RIGHT", { width - 230.f, 395.f }, 14);
+        drawText("CURRENT NODE:",
+            { width - 230.f, 215.f }, 15);
 
-    drawText(searchResult, { width - 230.f, 455.f }, 13);
+        if (bstInsertCurrentNode != nullptr)
+        {
+            drawText(to_string(bstInsertCurrentNode->data),
+                { width - 230.f, 240.f }, 23);
+        }
+
+        drawText("Choose direction:",
+            { width - 230.f, 290.f }, 15);
+
+        if (!bstInsertReadyToInsert)
+        {
+            drawButton("GO LEFT",
+                { width - 230.f, 325.f }, { 190.f, 40.f });
+
+            drawButton("GO RIGHT",
+                { width - 230.f, 375.f }, { 190.f, 40.f });
+        }
+        else
+        {
+            drawText("Empty position found!",
+                { width - 230.f, 325.f }, 14);
+
+            drawButton("INSERT HERE",
+                { width - 230.f, 375.f }, { 190.f, 40.f });
+        }
+
+        drawText("Comparisons: " +
+            to_string(bstInsertComparisons),
+            { width - 230.f, 445.f }, 15);
+    }
+
+    drawText(searchResult,
+        { width - 230.f, 500.f }, 13);
+
+    drawText("BST RULE:",
+        { width - 230.f, 545.f }, 14);
+
+    drawText("Smaller = LEFT",
+        { width - 230.f, 570.f }, 13);
+
+    drawText("Larger = RIGHT",
+        { width - 230.f, 590.f }, 13);
 }
+
 
 void Game::drawBSTLevel3()
 {
@@ -3139,45 +3194,46 @@ void Game::handleBSTLevel2Click(Vector2i mousePosition)
 {
     float width = static_cast<float>(window.getSize().x);
 
-    // Value input field
-    if (isMouseOver(mousePosition, { width - 230.f, 205.f }, { 190.f, 40.f }))
+    // BEFORE INSERTION STARTS
+    if (!bstInsertStarted)
     {
-        searchInputActive = true;
+        if (isMouseOver(mousePosition,
+            { width - 230.f, 205.f }, { 190.f, 40.f }))
+        {
+            searchInputActive = true;
+        }
+        else if (isMouseOver(mousePosition,
+            { width - 230.f, 265.f }, { 190.f, 40.f }))
+        {
+            searchInputActive = false;
+            startBSTInsertion();
+        }
+
+        return;
     }
 
-    // Insert Value
-    else if (isMouseOver(mousePosition, { width - 230.f, 265.f }, { 190.f, 40.f }))
+    // AFTER INSERTION STARTS
+
+    if (bstInsertReadyToInsert)
     {
-        searchInputActive = false;
-
-        if (searchInput.empty())
+        if (isMouseOver(mousePosition,
+            { width - 230.f, 375.f }, { 190.f, 40.f }))
         {
-            searchResult = "Enter a value first.";
-            return;
+            confirmBSTInsertion();
         }
-
-        int value = stoi(searchInput);
-
-        int path[100];
-        int pathLength = 0;
-
-        // Check whether the value already exists
-        if (bst.search(value, path, &pathLength))
+    }
+    else
+    {
+        if (isMouseOver(mousePosition,
+            { width - 230.f, 325.f }, { 190.f, 40.f }))
         {
-            searchResult = "Duplicates are not allowed!";
-            searchInput = "";
-            return;
+            moveBSTInsertLeft();
         }
-
-        bst.insert(value);
-
-        rebuildVisualTree();
-        positionGameplayTree();
-
-        searchResult = "Inserted " + to_string(value) + " successfully!";
-        bstLevelSuccess = true;
-
-        searchInput = "";
+        else if (isMouseOver(mousePosition,
+            { width - 230.f, 375.f }, { 190.f, 40.f }))
+        {
+            moveBSTInsertRight();
+        }
     }
 }
 
@@ -3456,3 +3512,158 @@ VisualNode* Game::findClickedNode(VisualNode* node, Vector2i mousePosition)
     // Search the right subtree.
     return findClickedNode(node->right, mousePosition);
 }
+
+void Game::startBSTInsertion()
+{
+    if (searchInput.empty())
+    {
+        searchResult = "Enter a value first.";
+        return;
+    }
+
+    bstInsertValue = stoi(searchInput);
+
+    // Check for duplicates.
+    int path[100];
+    int pathLength = 0;
+
+    if (bst.search(bstInsertValue, path, &pathLength))
+    {
+        searchResult = "Duplicates are not allowed!";
+        searchInput = "";
+        return;
+    }
+
+    // Reset insertion progress.
+    bstInsertCurrentNode = bst.getRoot();
+    bstInsertParentNode = nullptr;
+
+    bstInsertComparisons = 0;
+    bstInsertStarted = true;
+    bstInsertReadyToInsert = false;
+    bstInsertLeft = false;
+
+    searchInput = "";
+
+    searchResult = "Compare with the root. Choose LEFT or RIGHT.";
+}
+
+void Game::moveBSTInsertLeft()
+{
+    if (!bstInsertStarted || bstInsertReadyToInsert ||
+        bstInsertCurrentNode == nullptr)
+    {
+        return;
+    }
+
+    // The value must be smaller to go left.
+    if (bstInsertValue >= bstInsertCurrentNode->data)
+    {
+        searchResult = "Wrong direction! Choose RIGHT.";
+        return;
+    }
+
+    bstInsertComparisons++;
+
+    bstInsertParentNode = bstInsertCurrentNode;
+    bstInsertLeft = true;
+
+    if (bstInsertCurrentNode->left == nullptr)
+    {
+        bstInsertReadyToInsert = true;
+        searchResult = "Correct! Empty left position found.";
+    }
+    else
+    {
+        bstInsertCurrentNode = bstInsertCurrentNode->left;
+        searchResult = "Correct! Now compare with " +
+            to_string(bstInsertCurrentNode->data);
+    }
+}
+
+void Game::moveBSTInsertRight()
+{
+    if (!bstInsertStarted || bstInsertReadyToInsert ||
+        bstInsertCurrentNode == nullptr)
+    {
+        return;
+    }
+
+    // The value must be greater to go right.
+    if (bstInsertValue <= bstInsertCurrentNode->data)
+    {
+        searchResult = "Wrong direction! Choose LEFT.";
+        return;
+    }
+
+    bstInsertComparisons++;
+
+    bstInsertParentNode = bstInsertCurrentNode;
+    bstInsertLeft = false;
+
+    if (bstInsertCurrentNode->right == nullptr)
+    {
+        bstInsertReadyToInsert = true;
+        searchResult = "Correct! Empty right position found.";
+    }
+    else
+    {
+        bstInsertCurrentNode = bstInsertCurrentNode->right;
+        searchResult = "Correct! Now compare with " +
+            to_string(bstInsertCurrentNode->data);
+    }
+}
+
+void Game::confirmBSTInsertion()
+{
+    if (!bstInsertStarted || !bstInsertReadyToInsert ||
+        bstInsertParentNode == nullptr)
+    {
+        return;
+    }
+
+    Node* newNode = new Node(bstInsertValue);
+
+    if (bstInsertLeft)
+    {
+        bstInsertParentNode->left = newNode;
+    }
+    else
+    {
+        bstInsertParentNode->right = newNode;
+    }
+
+    rebuildVisualTree();
+    positionGameplayTree();
+
+    searchResult = "Successfully inserted " +
+        to_string(bstInsertValue) + "!";
+
+    bstLevelSuccess = true;
+
+    bstInsertStarted = false;
+    bstInsertReadyToInsert = false;
+    bstInsertCurrentNode = nullptr;
+    bstInsertParentNode = nullptr;
+}
+
+void Game::resetBSTInsertion()
+{
+    searchInput = "";
+    searchResult = "";
+
+    searchInputActive = false;
+
+    bstInsertCurrentNode = nullptr;
+    bstInsertParentNode = nullptr;
+
+    bstInsertValue = -1;
+    bstInsertComparisons = 0;
+
+    bstInsertStarted = false;
+    bstInsertReadyToInsert = false;
+    bstInsertLeft = false;
+
+    bstLevelSuccess = false;
+}
+
