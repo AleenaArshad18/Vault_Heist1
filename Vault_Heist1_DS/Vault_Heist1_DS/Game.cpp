@@ -6,7 +6,7 @@
 #include <functional>
 using namespace sf;
 using namespace std;
-//comment
+//comment 2.2
 namespace
 {
     string getBinaryTraversal(Node* root, int order)
