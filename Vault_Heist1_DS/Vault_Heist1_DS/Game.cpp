@@ -9,6 +9,8 @@
 using namespace sf;
 using namespace std;
 
+//comment
+
 namespace
 {
     string getBinaryTraversal(Node* root, int order)
